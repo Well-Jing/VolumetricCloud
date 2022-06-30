@@ -1,0 +1,4 @@
+﻿  Main.cpp
+Main.obj : error LNK2001: unresolved external symbol glfwInit
+Main.obj : error LNK2001: unresolved external symbol glfwWindowHint
+D:\VolumetricCloud\VolumetricCloud\x64\Release\VolumetricCloud.exe : fatal error LNK1120: 2 unresolved externals

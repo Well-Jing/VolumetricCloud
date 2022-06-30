@@ -18,6 +18,7 @@ uniform float aspect;
 uniform float time;
 uniform vec2 resolution;
 uniform float downscale;
+uniform vec3 cameraPos;
 
 //preetham variables
 in vec3 vSunDirection;
@@ -378,18 +379,19 @@ void main()
 {
 	vec2 shift = vec2(floor(float(check)/downscale), mod(float(check), downscale));	
 	//shift = vec2(0.0);
-	vec2 uv = (gl_FragCoord.xy*downscale+shift.yx)/(resolution);
+	vec2 uv = (gl_FragCoord.xy*downscale+shift.yx)/(resolution); // !: shift.yx, not .xy (why do not change the order in the previous) 
 	uv = uv-vec2(0.5);
 	uv *= 2.0;
-	uv.x *= aspect;
-	vec4 uvdir = (vec4(uv.xy, 1.0, 1.0));
-	vec4 worldPos = (inverse((MVPM))*uvdir);
-	vec3 dir = normalize(worldPos.xyz/worldPos.w);
+	uv.x *= aspect;  // after multiply aspect (may > 1), the uv may over -1 and 1 (exceed clip space), this may cause problems when calculating world space position
+	vec4 uvdir = vec4(uv.xy, 1.0, 1.0);
+	vec4 worldPos = inverse(MVPM)*uvdir;
+	vec3 dir = normalize(worldPos.xyz/worldPos.w);  // I do not sure divided by w is necessary or not, but with it is definitly right
+	                                                // it works without divided by w
 
 	vec4 col = vec4(0.0);
 	if (dir.y>0.0) { // if it is higher than horizon
 
-		vec3 camPos = vec3(0.0, g_radius, 0.0);
+		vec3 camPos = vec3(0.0, g_radius, 0.0) + cameraPos;
 		vec3 start = camPos+dir*intersectSphere(camPos, dir, sky_b_radius);
 		vec3 end = camPos+dir*intersectSphere(camPos, dir, sky_t_radius);
 		const float t_dist = sky_t_radius-sky_b_radius;

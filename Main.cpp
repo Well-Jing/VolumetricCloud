@@ -43,7 +43,7 @@ GLfloat startTime = 0.0f;
 #pragma region Window Attribution
 // Window dimensions
 //const GLuint WIDTH = 1280, HEIGHT = 720;
-const GLuint WIDTH = 512 * 2, HEIGHT = 512 * 2; // if the window is not square, some antefacts show up
+const GLuint WIDTH = 512 * 2.0, HEIGHT = 512 * 2.0; // if the window is not square, some antefacts show up
 const GLuint downscale = 4; //4 is best//any more and the gains dont make up for the lag
 GLuint downscalesq = downscale * downscale;
 GLfloat ASPECT = float(WIDTH) / float(HEIGHT);
@@ -182,27 +182,28 @@ int main()
 #pragma region Uniform ID
     //setup shader uniform info
     ourShader.use();
-    GLuint uniformMatrix = glGetUniformLocation(ourShader.ID, "MVPM");
-    GLuint aspectUniform = glGetUniformLocation(ourShader.ID, "aspect");
-    GLuint checku = glGetUniformLocation(ourShader.ID, "check");
-    GLuint timeu = glGetUniformLocation(ourShader.ID, "time");
-    GLuint resolutionu = glGetUniformLocation(ourShader.ID, "resolution");
-    GLuint downscaleu = glGetUniformLocation(ourShader.ID, "downscale");
+    GLuint uniformMatrix =   glGetUniformLocation(ourShader.ID, "MVPM");
+    GLuint aspectUniform =   glGetUniformLocation(ourShader.ID, "aspect");
+    GLuint checku =          glGetUniformLocation(ourShader.ID, "check");
+    GLuint timeu =           glGetUniformLocation(ourShader.ID, "time");
+    GLuint resolutionu =     glGetUniformLocation(ourShader.ID, "resolution");
+    GLuint downscaleu =      glGetUniformLocation(ourShader.ID, "downscale");
     GLuint perlworluniform = glGetUniformLocation(ourShader.ID, "perlworl");
-    GLuint worluniform = glGetUniformLocation(ourShader.ID, "worl");
-    GLuint curluniform = glGetUniformLocation(ourShader.ID, "curl");
-    GLuint weatheruniform = glGetUniformLocation(ourShader.ID, "weather");
-    GLuint psunPosition = glGetUniformLocation(ourShader.ID, "sunPosition");//for preetham
+    GLuint worluniform =     glGetUniformLocation(ourShader.ID, "worl");
+    GLuint curluniform =     glGetUniformLocation(ourShader.ID, "curl");
+    GLuint weatheruniform =  glGetUniformLocation(ourShader.ID, "weather");
+    GLuint psunPosition =    glGetUniformLocation(ourShader.ID, "sunPosition");//for preetham
+    GLuint cameraPosition =  glGetUniformLocation(ourShader.ID, "cameraPos");
 
     upscaleShader.use();
-    GLuint upuniformMatrix = glGetUniformLocation(upscaleShader.ID, "MVPM");
+    GLuint upuniformMatrix =   glGetUniformLocation(upscaleShader.ID, "MVPM");
     GLuint upLFuniformMatrix = glGetUniformLocation(upscaleShader.ID, "LFMVPM");
-    GLuint upcheck = glGetUniformLocation(upscaleShader.ID, "check");
-    GLuint upresolution = glGetUniformLocation(upscaleShader.ID, "resolution");
-    GLuint updownscale = glGetUniformLocation(upscaleShader.ID, "downscale");
-    GLuint upaspect = glGetUniformLocation(upscaleShader.ID, "aspect");
-    GLuint buffuniform = glGetUniformLocation(upscaleShader.ID, "buff");
-    GLuint ponguniform = glGetUniformLocation(upscaleShader.ID, "pong");
+    GLuint upcheck =           glGetUniformLocation(upscaleShader.ID, "check");
+    GLuint upresolution =      glGetUniformLocation(upscaleShader.ID, "resolution");
+    GLuint updownscale =       glGetUniformLocation(upscaleShader.ID, "downscale");
+    GLuint upaspect =          glGetUniformLocation(upscaleShader.ID, "aspect");
+    GLuint buffuniform =       glGetUniformLocation(upscaleShader.ID, "buff");
+    GLuint ponguniform =       glGetUniformLocation(upscaleShader.ID, "pong");
 #pragma endregion
     
     int check = 0; // used for checkerboarding in the upscale shader
@@ -249,6 +250,7 @@ int main()
         glUniform1i(checku, (check) % (downscalesq));
         glUniform2f(resolutionu, GLfloat(WIDTH), GLfloat(HEIGHT));
         glUniform1f(downscaleu, GLfloat(downscale));
+        glUniform3f(cameraPosition, camera.Position.x, camera.Position.y, camera.Position.z);
 
         glUniform1i(perlworluniform, 0); // 4 textures
         glUniform1i(worluniform, 1);
@@ -406,13 +408,25 @@ void keyCallBack(GLFWwindow* window, int key, int scancode, int action, int mode
 
     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
         glfwSetWindowShouldClose(window, GL_TRUE);
-    if (key >= 0 && key < 1024)
+    /*if (key >= 0 && key < 1024)
     {
         if (action == GLFW_PRESS)
             keys[key] = true;
         else if (action == GLFW_RELEASE)
             keys[key] = false;
+    }*/
+
+    // the movement of the camera has problems
+    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+    {
+        camera.Position += glm::vec3(100.0f, 0.0f, 0.0f);
     }
+    else if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+    {
+        camera.Position += glm::vec3(-100.0f, 0.0f, 0.0f);
+    }
+
+
 }
 
 unsigned int loadTexture2D(const std::string& path, bool gamma)

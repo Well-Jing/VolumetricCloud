@@ -20,11 +20,12 @@ void main()
 {
 	vec2 shift = vec2(floor(float(check)/downscale), mod(float(check), downscale));	
 
-	vec2 uv = floor(gl_FragCoord.xy/downscale);
-	uv = uv/(resolution/downscale);
+	//vec2 uv = floor(gl_FragCoord.xy/downscale);  // these two lines can be written into one
+	//uv = uv/(resolution/downscale);             
+	vec2 uv = gl_FragCoord.xy/resolution;
 
 	vec4 col = vec4(0.0);
-	// if the pixel is not the pixel to update, reuse pixel from previous frame
+	// if the pixel is not the pixel to update, reuse pixel from previous frame (pong)
 	// otherwise, use the result from ourShader (the result in buff sampler)
 	if (check_pos(gl_FragCoord.xy, downscale)!=check){
 		//reprojection from http://john-chapman-graphics.blogspot.ca/2013/01/what-is-motion-blur-motion-pictures-are.html
@@ -32,9 +33,9 @@ void main()
 		//discard;
 		vec2 uvd = gl_FragCoord.xy/resolution-vec2(0.5);
 		uvd *= 2.0;
-		vec4 uvdir = (vec4(uvd, 1.0, 1.0));
+		vec4 uvdir = vec4(uvd, 1.0, 1.0);
 		mat4 invmat = inverse(MVPM);
-		vec4 worldPos = (inverse((MVPM))*uvdir);
+		vec4 worldPos = inverse(MVPM)*uvdir;
 		vec4 current = worldPos;
 		vec4 previous = LFMVPM * current;
 		previous.xyz /= previous.w;
@@ -43,15 +44,15 @@ void main()
 		vec2 lookup = uv.xy + blurVec;
 		float mip = 0.0;
 		if (lookup.x < 0.0 || lookup.x > 1.0 || lookup.y < 0.0 || lookup.y > 1.0) {
-			col = texture(buff, uv.xy);
+			col = texture(buff, uv.xy); // buff is the current frame
 		} else {
-			uv = gl_FragCoord.xy / resolution;
-			col = texture(pong, lookup);
+			//uv = gl_FragCoord.xy / resolution; // I think this line is not useful
+			col = texture(pong, lookup); // pong is previous frame
 		}
 	} 
 	else 
 	{
-		col = texture(buff, uv.xy);
+		col = texture(buff, uv.xy); // buff is current frame
 	}
 	color.xyz = col.xyz;
 	color.a = 1.0;

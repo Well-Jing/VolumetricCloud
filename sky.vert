@@ -211,7 +211,7 @@ vec3 totalMie( float T ) {
 }
 
 void main() {
-	gl_Position = vec4( position, -1.0, 1.0 );
+	gl_Position = vec4( position, -1.0, 1.0 );  // here z=-1.0 means in clip sapce, it is on the near plane 
 
 	vSunDirection = normalize( sunPosition );
 

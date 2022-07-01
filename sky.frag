@@ -14,6 +14,9 @@ uniform sampler2D weather;
 
 uniform int check;
 uniform mat4 MVPM; 
+uniform mat4 invMVPM;
+uniform mat4 invView;
+uniform mat4 invProj;
 uniform float aspect;
 uniform float time;
 uniform vec2 resolution;
@@ -384,14 +387,20 @@ void main()
 	uv *= 2.0;
 	uv.x *= aspect;  // after multiply aspect (may > 1), the uv may over -1 and 1 (exceed clip space), this may cause problems when calculating world space position
 	vec4 uvdir = vec4(uv.xy, 1.0, 1.0);
-	vec4 worldPos = inverse(MVPM)*uvdir;
-	vec3 dir = normalize(worldPos.xyz/worldPos.w);  // I do not sure divided by w is necessary or not, but with it is definitly right
-	                                                // it works without divided by w
+	//vec4 worldPos = inverse(MVPM)*uvdir;
+	//vec4 worldPos = invMVPM*uvdir;
+	vec4 worldPos = invView * (invProj * uvdir);
+	vec3 dir = normalize(worldPos.xyz/worldPos.w - cameraPos);  // I do not sure divided by w is necessary or not, but with it is definitly right
+	//vec3 dir = normalize(worldPos.xyz/worldPos.w + cameraPos - cameraPos);  // I do not sure divided by w is necessary or not, but with it is definitly right
+	                                                                        // it works without divided by w
+																			// since we move the cloud instead of the camera, so we add cameraPos
+																			// camera.Position is changed, but the View Matrix is computed from the origin
 
 	vec4 col = vec4(0.0);
 	if (dir.y>0.0) { // if it is higher than horizon
 
-		vec3 camPos = vec3(0.0, g_radius, 0.0) + cameraPos;
+		//vec3 camPos = vec3(0.0, g_radius, 0.0) + cameraPos;
+		vec3 camPos = vec3(0.0, g_radius, 0.0) + cameraPos; // instead move camera, we move the cloud
 		vec3 start = camPos+dir*intersectSphere(camPos, dir, sky_b_radius);
 		vec3 end = camPos+dir*intersectSphere(camPos, dir, sky_t_radius);
 		const float t_dist = sky_t_radius-sky_b_radius;

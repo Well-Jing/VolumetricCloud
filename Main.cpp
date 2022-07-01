@@ -1,6 +1,7 @@
 #include <iostream>
 #include <stdlib.h> 
 #include <string>
+#include <iomanip>
 
 #define GLEW_STATIC
 #include <GL/glew.h>
@@ -8,6 +9,7 @@
 #include <glm.hpp>
 #include <gtc/matrix_transform.hpp>
 #include <gtc/type_ptr.hpp>
+#include <gtx/string_cast.hpp>
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
@@ -17,17 +19,19 @@
 void keyCallBack(GLFWwindow* window, int key, int scancode, int action, int mode);
 void scrollCallback(GLFWwindow* window, double xoffset, double yoffset);
 void mouseCallback(GLFWwindow* window, double xpos, double ypos);
-void doMovement();
 unsigned int loadTexture2D(const std::string& path, bool gamma = true);
 unsigned int loadTexture3D(const std::string& path, float width, float height, float depth, bool gamma = true);
+glm::vec3 getSunPosition(float time);
+
 
 #pragma region Camera Creation and Attribution
 // Camera
-Camera camera(glm::vec3(0.0f, 0.0f, 3.0f));
+Camera camera(glm::vec3(0.0f, 0.0f, 0.0f));
 bool keys[1024];
 GLfloat lastX = 400, lastY = 300;
 bool firstMouse = true;
 glm::mat4 MVPM;
+glm::mat4 invMVPM;
 glm::mat4 LFMVPM;
 #pragma endregion
 
@@ -179,32 +183,6 @@ int main()
     MVPM = projection * view;
 #pragma endregion
 
-#pragma region Uniform ID
-    //setup shader uniform info
-    ourShader.use();
-    GLuint uniformMatrix =   glGetUniformLocation(ourShader.ID, "MVPM");
-    GLuint aspectUniform =   glGetUniformLocation(ourShader.ID, "aspect");
-    GLuint checku =          glGetUniformLocation(ourShader.ID, "check");
-    GLuint timeu =           glGetUniformLocation(ourShader.ID, "time");
-    GLuint resolutionu =     glGetUniformLocation(ourShader.ID, "resolution");
-    GLuint downscaleu =      glGetUniformLocation(ourShader.ID, "downscale");
-    GLuint perlworluniform = glGetUniformLocation(ourShader.ID, "perlworl");
-    GLuint worluniform =     glGetUniformLocation(ourShader.ID, "worl");
-    GLuint curluniform =     glGetUniformLocation(ourShader.ID, "curl");
-    GLuint weatheruniform =  glGetUniformLocation(ourShader.ID, "weather");
-    GLuint psunPosition =    glGetUniformLocation(ourShader.ID, "sunPosition");//for preetham
-    GLuint cameraPosition =  glGetUniformLocation(ourShader.ID, "cameraPos");
-
-    upscaleShader.use();
-    GLuint upuniformMatrix =   glGetUniformLocation(upscaleShader.ID, "MVPM");
-    GLuint upLFuniformMatrix = glGetUniformLocation(upscaleShader.ID, "LFMVPM");
-    GLuint upcheck =           glGetUniformLocation(upscaleShader.ID, "check");
-    GLuint upresolution =      glGetUniformLocation(upscaleShader.ID, "resolution");
-    GLuint updownscale =       glGetUniformLocation(upscaleShader.ID, "downscale");
-    GLuint upaspect =          glGetUniformLocation(upscaleShader.ID, "aspect");
-    GLuint buffuniform =       glGetUniformLocation(upscaleShader.ID, "buff");
-    GLuint ponguniform =       glGetUniformLocation(upscaleShader.ID, "pong");
-#pragma endregion
     
     int check = 0; // used for checkerboarding in the upscale shader
     while (!glfwWindowShouldClose(window))
@@ -221,6 +199,35 @@ int main()
             startTime = timePassed;
             frames = 0;
         }
+
+        /*glm::mat4 newMat = glm::inverse(view) * (glm::inverse(projection) * projection) * view;
+        glm::mat4 newMat2 = glm::inverse(view) * glm::inverse(projection) * projection * view;
+        glm::mat4 newMatView = glm::inverse(view) * view;
+        glm::mat4 newMatProj = glm::inverse(projection) * projection;
+        glm::mat4 translate = glm::translate(glm::mat4(1.0f), glm::vec3(10000.0f, 11110.0f, 22222.0f));
+        translate[2][0] = 0.1f;
+        translate[1][0] = 0.2f;
+        translate[3][2] = 0.2f;
+        glm::mat4 invTranslate = glm::inverse(translate);
+
+        glm::mat4 resultMat = invTranslate * translate;
+
+        if (int(timePassed) - int(lastFrame))
+        {
+            std::cout.setf(std::ios::fixed);
+            std::cout << std::setprecision(5) << std::setw(8) << std::endl;
+
+            std::cout << "Translate Matrix: " << std::endl;
+            std::cout << std::setw(10) << translate[0][0] << " " << std::setw(10) << translate[0][1] << " " << std::setw(10) << translate[0][2] << " " << std::setw(10) << translate[0][3] << "   " << std::endl;
+            std::cout << std::setw(10) << translate[1][0] << " " << std::setw(10) << translate[1][1] << " " << std::setw(10) << translate[1][2] << " " << std::setw(10) << translate[1][3] << "   " << std::endl;
+            std::cout << std::setw(10) << translate[2][0] << " " << std::setw(10) << translate[2][1] << " " << std::setw(10) << translate[2][2] << " " << std::setw(10) << translate[2][3] << "   " << std::endl;
+            std::cout << std::setw(10) << translate[3][0] << " " << std::setw(10) << translate[3][1] << " " << std::setw(10) << translate[3][2] << " " << std::setw(10) << translate[3][3] << "   " << std::endl;
+
+            std::cout << "==================================================================" << std::endl;
+        }*/
+
+
+
         lastFrame = currentFrame;
         frames++;
 
@@ -228,7 +235,15 @@ int main()
 
         // check camera movement
         glfwPollEvents();
-        doMovement();
+
+        // update MVP matrix
+        view = camera.getViewMatrix();
+        projection = glm::perspective(glm::radians(camera.Zoom), (float)WIDTH / (float)HEIGHT, 0.1f, 1000.0f);
+        MVPM = projection * view;
+        //invMVPM = glm::inverse(MVPM);
+        invMVPM = glm::inverse(view) * glm::inverse(projection);
+        //glm::mat4 newMat = invMVPM * MVPM;
+        
 
         // check for errors TODO wrap in a define DEBUG
         GLenum err;
@@ -238,36 +253,31 @@ int main()
         }
 
 
-        // Write to quarter scale buffer
-        glBindFramebuffer(GL_FRAMEBUFFER, subbuffer);
+        // Write to quarter scale buffer (1/16 sized)
+        glBindFramebuffer(GL_FRAMEBUFFER, subbuffer);  // bind fbo, the draw texture is 
         glViewport(0, 0, WIDTH / downscale, HEIGHT / downscale);  // now the downscale is 4, 1/16 sized image
 
         ourShader.use();
+        ourShader.setUniform1i("check", check % downscalesq);
+        ourShader.setUniform1f("time", timePassed);
+        ourShader.setUniform1f("aspect", ASPECT);
+        ourShader.setUniform1f("downscale", (float)downscale);
+        ourShader.setUniform2f("resolution", glm::vec2((float)WIDTH, (float)HEIGHT));
+        ourShader.setUniform3f("cameraPos", camera.Position);
+        ourShader.setUniformMatrix("MVPM", MVPM);
+        ourShader.setUniformMatrix("invMVPM", invMVPM);
+        ourShader.setUniformMatrix("invView", glm::inverse(view));
+        ourShader.setUniformMatrix("invProj", glm::inverse(projection));
 
-        glUniform1f(timeu, timePassed);
-        glUniformMatrix4fv(uniformMatrix, 1, GL_FALSE, glm::value_ptr(MVPM));
-        glUniform1f(aspectUniform, ASPECT);
-        glUniform1i(checku, (check) % (downscalesq));
-        glUniform2f(resolutionu, GLfloat(WIDTH), GLfloat(HEIGHT));
-        glUniform1f(downscaleu, GLfloat(downscale));
-        glUniform3f(cameraPosition, camera.Position.x, camera.Position.y, camera.Position.z);
+        //glm::vec3 sunPos = getSunPosition(timePassed);
+        glm::vec3 sunPos = getSunPosition(1);
+        ourShader.setUniform3f("sunPosition", sunPos);
 
-        glUniform1i(perlworluniform, 0); // 4 textures
-        glUniform1i(worluniform, 1);
-        glUniform1i(curluniform, 2);
-        glUniform1i(weatheruniform, 3);
-
-        // variables for preetham model  (A Practical Analytic Model for Daylight, 1999 ???)
-        const float PI = 3.141592653589793238462643383279502884197169;
-        //float theta = PI * (-0.23 + 0.25 * sin(timePassed * 0.1)); // change sun position
-        float theta = PI * (-0.23 + 0.25 * sin(1 * 0.1)); // keep sun position
-        float phi = 2 * PI * (-0.25);
-        float sunposx = cos(phi);
-        float sunposy = sin(phi) * sin(theta);
-        float sunposz = sin(phi) * cos(theta);
-        glUniform3f(psunPosition, GLfloat(sunposx), GLfloat(sunposy), GLfloat(sunposz));
-
-
+        // set textures (weather + noise)
+        ourShader.setUniform1i("perlworl", 0);
+        ourShader.setUniform1i("worl", 1);
+        ourShader.setUniform1i("curl", 2);
+        ourShader.setUniform1i("weather", 3);
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_3D, perlworltex);
         glActiveTexture(GL_TEXTURE1);
@@ -287,16 +297,19 @@ int main()
         glViewport(0, 0, WIDTH, HEIGHT);
 
         upscaleShader.use();
-        glUniformMatrix4fv(upLFuniformMatrix, 1, GL_FALSE, glm::value_ptr(LFMVPM));
-        glUniformMatrix4fv(upuniformMatrix, 1, GL_FALSE, glm::value_ptr(MVPM));
-        glUniform1i(upcheck, (check) % downscalesq);
-        glUniform2f(upresolution, GLfloat(WIDTH), GLfloat(HEIGHT));
-        glUniform1f(updownscale, GLfloat(downscale));
-        glUniform1f(upaspect, ASPECT);
+        upscaleShader.setUniform1i("check", check % downscalesq);
+        upscaleShader.setUniform1f("downscale", (float)downscale);
+        upscaleShader.setUniform1f("aspect", ASPECT);
+        upscaleShader.setUniform2f("resolution", glm::vec2((float)WIDTH, (float)HEIGHT));
+        upscaleShader.setUniformMatrix("MVPM", MVPM);
+        upscaleShader.setUniformMatrix("invMVPM", invMVPM);
+        upscaleShader.setUniformMatrix("invView", glm::inverse(view));
+        upscaleShader.setUniformMatrix("invProj", glm::inverse(projection));
+        upscaleShader.setUniformMatrix("LFMVPM", LFMVPM);
 
-        glUniform1i(buffuniform, 0);
-        glUniform1i(ponguniform, 1);
-
+        // set textures
+        upscaleShader.setUniform1i("buff", 0);
+        upscaleShader.setUniform1i("pong", 1);
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, subbuffertex);
         glActiveTexture(GL_TEXTURE1);
@@ -309,7 +322,6 @@ int main()
 
         // copy the full size buffer so it can be read from next frame
         glBindFramebuffer(GL_FRAMEBUFFER, copyfbo);
-
         postShader.use();
 
         glActiveTexture(GL_TEXTURE0);
@@ -320,9 +332,8 @@ int main()
         glBindVertexArray(0);
 
 
-        // copy to the screen
+        // copy to the main screen (display)
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
         postShader.use();
 
         glActiveTexture(GL_TEXTURE0);
@@ -358,15 +369,6 @@ int main()
     
 }
 
-void doMovement()
-{
-    glm::mat4 view;
-    view = camera.getViewMatrix();
-    glm::mat4 projection;
-    projection = glm::perspective(glm::radians(camera.Zoom), (float)WIDTH / (float)HEIGHT, 0.1f, 1000.0f);
-    MVPM = projection * view;
-}
-
 void mouseCallback(GLFWwindow* window, double xpos, double ypos)
 {
     if (firstMouse)
@@ -384,30 +386,30 @@ void mouseCallback(GLFWwindow* window, double xpos, double ypos)
 
     camera.processMouseMovement(xoffset, yoffset);
 
-    glm::mat4 view;
+    /*glm::mat4 view;
     view = camera.getViewMatrix();
     glm::mat4 projection;
     projection = glm::perspective(glm::radians(camera.Zoom), (float)WIDTH / (float)HEIGHT, 0.1f, 1000.0f);
-    MVPM = projection * view;
+    MVPM = projection * view;*/
 }
 
 void scrollCallback(GLFWwindow* window, double xoffset, double yoffset)
 {
     camera.processMouseScroll(yoffset);
 
-    glm::mat4 view;
+    /*glm::mat4 view;
     view = camera.getViewMatrix();
     glm::mat4 projection;
     projection = glm::perspective(glm::radians(camera.Zoom), (float)WIDTH / (float)HEIGHT, 0.1f, 1000.0f);
-    MVPM = projection * view;
+    MVPM = projection * view;*/
 }
 
 void keyCallBack(GLFWwindow* window, int key, int scancode, int action, int mode)
 {
-    //cout << key << endl;
-
     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
         glfwSetWindowShouldClose(window, GL_TRUE);
+
+    // this might be useful in the future
     /*if (key >= 0 && key < 1024)
     {
         if (action == GLFW_PRESS)
@@ -419,13 +421,20 @@ void keyCallBack(GLFWwindow* window, int key, int scancode, int action, int mode
     // the movement of the camera has problems
     if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
     {
-        camera.Position += glm::vec3(100.0f, 0.0f, 0.0f);
+        camera.processKeyboard(Camera_Movement::FORWARD, deltaTime, 100);
     }
-    else if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
     {
-        camera.Position += glm::vec3(-100.0f, 0.0f, 0.0f);
+        camera.processKeyboard(Camera_Movement::BACKWARD, deltaTime, 100);
     }
-
+    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+    {
+        camera.processKeyboard(Camera_Movement::LEFT, deltaTime, 100);
+    }
+    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+    {
+        camera.processKeyboard(Camera_Movement::RIGHT, deltaTime, 100);
+    }
 
 }
 
@@ -507,4 +516,16 @@ unsigned int loadTexture3D(const std::string& path, float width, float height, f
     }
 
     return textureID;
+}
+
+glm::vec3 getSunPosition(float time)
+{
+    const float PI = 3.141592653589793238462643383279502884197169;
+    float theta = PI * (-0.23 + 0.25 * sin(time * 0.1)); // change sun position as time passing
+    float phi = 2 * PI * (-0.25);
+    float sunposx = cos(phi);
+    float sunposy = sin(phi) * sin(theta);
+    float sunposz = sin(phi) * cos(theta);
+
+    return glm::vec3(sunposx, sunposy, sunposz);
 }

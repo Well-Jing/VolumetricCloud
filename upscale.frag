@@ -5,6 +5,9 @@ uniform sampler2D pong;
 uniform int check;
 uniform mat4 MVPM;
 uniform mat4 LFMVPM;
+uniform mat4 invMVPM;
+uniform mat4 invProj;
+uniform mat4 invView;
 uniform vec2 resolution;
 uniform float downscale;
 uniform float aspect;
@@ -34,8 +37,10 @@ void main()
 		vec2 uvd = gl_FragCoord.xy/resolution-vec2(0.5);
 		uvd *= 2.0;
 		vec4 uvdir = vec4(uvd, 1.0, 1.0);
-		mat4 invmat = inverse(MVPM);
-		vec4 worldPos = inverse(MVPM)*uvdir;
+		//mat4 invmat = inverse(MVPM);
+		//vec4 worldPos = inverse(MVPM)*uvdir;
+		//vec4 worldPos = invMVPM*uvdir;
+		vec4 worldPos = invView * (invProj * uvdir);
 		vec4 current = worldPos;
 		vec4 previous = LFMVPM * current;
 		previous.xyz /= previous.w;
@@ -48,6 +53,7 @@ void main()
 		} else {
 			//uv = gl_FragCoord.xy / resolution; // I think this line is not useful
 			col = texture(pong, lookup); // pong is previous frame
+			//col = texture(buff, uv.xy);
 		}
 	} 
 	else 

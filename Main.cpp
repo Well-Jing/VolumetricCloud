@@ -12,6 +12,9 @@
 #include <gtx/string_cast.hpp>
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
+#include "imgui/imgui.h" // Configure imgui 1/5, remember to exclude main.cpp in imgui folder
+#include "imgui/imgui_impl_glfw.h"
+#include "imgui/imgui_impl_opengl3.h"
 
 #include "Shader.h"
 #include "Camera.h"
@@ -183,6 +186,12 @@ int main()
     MVPM = projection * view;
 #pragma endregion
 
+    // Configure imgui 2/5
+    const char* glsl_version = "#version 130";
+    ImGui::CreateContext();
+    ImGui_ImplGlfw_InitForOpenGL(window, true);
+    ImGui_ImplOpenGL3_Init(glsl_version);
+    ImGui::StyleColorsDark();
     
     int check = 0; // used for checkerboarding in the upscale shader
     while (!glfwWindowShouldClose(window))
@@ -292,6 +301,21 @@ int main()
         glBindVertexArray(0);
 
 
+        // Configure 3/5 
+        ImGui_ImplOpenGL3_NewFrame();
+        ImGui_ImplGlfw_NewFrame();
+        ImGui::NewFrame();
+        {
+            ImGui::Begin("ImGUI interface");                          // Create a window called "Hello, world!" and append into it.
+
+            //ImGui::Checkbox("Show effect with Normal Mapping", &displayBump);
+            //ImGui::Checkbox("Rotate the point light", &rotateLight);
+            //ImGui::SliderFloat("Light distance", &lightPosScaleRate, 0.3f, 1.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
+
+            ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+            ImGui::End();
+        }
+
         // upscale the buffer into full size framebuffer
         glBindFramebuffer(GL_FRAMEBUFFER, fbo);
         glViewport(0, 0, WIDTH, HEIGHT);
@@ -343,11 +367,20 @@ int main()
         glDrawArrays(GL_TRIANGLES, 0, 3);
         glBindVertexArray(0);
 
+        // Configure imgui 4/5
+        ImGui::Render();
+        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
         // Swap the screen buffers
         glfwSwapBuffers(window);
         check++;
     }
     
+    // Configure imgui 5/5
+    ImGui_ImplOpenGL3_Shutdown();
+    ImGui_ImplGlfw_Shutdown();
+    ImGui::DestroyContext();
+
 #pragma region Delete Buffers
     // not sure if this is necessary//it certainly looks bad
     glDeleteVertexArrays(1, &VAO);
@@ -421,19 +454,19 @@ void keyCallBack(GLFWwindow* window, int key, int scancode, int action, int mode
     // the movement of the camera has problems
     if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
     {
-        camera.processKeyboard(Camera_Movement::FORWARD, deltaTime, 100);
+        camera.processKeyboard(Camera_Movement::FORWARD, deltaTime, 1000);
     }
     if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
     {
-        camera.processKeyboard(Camera_Movement::BACKWARD, deltaTime, 100);
+        camera.processKeyboard(Camera_Movement::BACKWARD, deltaTime, 1000);
     }
     if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
     {
-        camera.processKeyboard(Camera_Movement::LEFT, deltaTime, 100);
+        camera.processKeyboard(Camera_Movement::LEFT, deltaTime, 1000);
     }
     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
     {
-        camera.processKeyboard(Camera_Movement::RIGHT, deltaTime, 100);
+        camera.processKeyboard(Camera_Movement::RIGHT, deltaTime, 1000);
     }
 
 }

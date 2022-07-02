@@ -105,15 +105,15 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>D:\OpenGL\glew-2.1.0-win32\glew-2.1.0\include;D:\OpenGL\glfw-3.3.7.bin.WIN32\glfw-3.3.7.bin.WIN32\include;D:\OpenGL\glm-0.9.8.5\glm\glm</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>F:\OpenGL\GLM\glm-0.9.8.5\glm\glm;F:\OpenGL\GLEW\glew-2.1.0-win32\glew-2.1.0\include;F:\OpenGL\GLFW\glfw-3.3.2.bin.WIN32\glfw-3.3.2.bin.WIN32\include;F:\OpenGL\Assimp5.0.0\cmake_built\include;F:\OpenGL\GLAD\glad\include;F:\OpenGL\ImGUI\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>opengl32.lib;glew32s.lib;glfw3.lib;User32.lib;Gdi32.lib;Shell32.lib</AdditionalDependencies>
-      <AdditionalLibraryDirectories>D:\OpenGL\glew-2.1.0-win32\glew-2.1.0\lib\Release\Win32;D:\OpenGL\glfw-3.3.7.bin.WIN32\glfw-3.3.7.bin.WIN32\lib-vc2019</AdditionalLibraryDirectories>
+      <AdditionalDependencies>opengl32.lib;glfw3.lib;glew32s.lib;assimp-vc141-mtd.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>F:\OpenGL\GLEW\glew-2.1.0-win32\glew-2.1.0\lib\Release\Win32;F:\OpenGL\GLFW\glfw-3.3.2.bin.WIN32\glfw-3.3.2.bin.WIN32\lib-vc2017;F:\OpenGL\Assimp5.0.0\cmake_built\libdll;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -152,6 +152,13 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Camera.cpp" />
+    <ClCompile Include="ImGUI\imgui.cpp" />
+    <ClCompile Include="ImGUI\imgui_demo.cpp" />
+    <ClCompile Include="ImGUI\imgui_draw.cpp" />
+    <ClCompile Include="ImGUI\imgui_impl_glfw.cpp" />
+    <ClCompile Include="ImGUI\imgui_impl_opengl3.cpp" />
+    <ClCompile Include="ImGUI\imgui_tables.cpp" />
+    <ClCompile Include="ImGUI\imgui_widgets.cpp" />
     <ClCompile Include="Main.cpp" />
     <ClCompile Include="Shader.cpp" />
   </ItemGroup>
@@ -165,6 +172,15 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Camera.h" />
+    <ClInclude Include="ImGUI\imconfig.h" />
+    <ClInclude Include="ImGUI\imgui.h" />
+    <ClInclude Include="ImGUI\imgui_impl_glfw.h" />
+    <ClInclude Include="ImGUI\imgui_impl_opengl3.h" />
+    <ClInclude Include="ImGUI\imgui_impl_opengl3_loader.h" />
+    <ClInclude Include="ImGUI\imgui_internal.h" />
+    <ClInclude Include="ImGUI\imstb_rectpack.h" />
+    <ClInclude Include="ImGUI\imstb_textedit.h" />
+    <ClInclude Include="ImGUI\imstb_truetype.h" />
     <ClInclude Include="Shader.h" />
     <ClInclude Include="stb_image.h" />
   </ItemGroup>

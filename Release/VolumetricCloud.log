@@ -1,30 +1,31 @@
-﻿  imgui.cpp
-  imgui_demo.cpp
-  imgui_draw.cpp
-  imgui_impl_glfw.cpp
-  imgui_impl_opengl3.cpp
-  imgui_tables.cpp
-  imgui_widgets.cpp
-  Main.cpp
-F:\Trinity\Dissertation\Project\VolumetricCloud\VolumetricCloud\Main.cpp(53,26): warning C4244: 'initializing': conversion from 'double' to 'GLuint', possible loss of data
-F:\Trinity\Dissertation\Project\VolumetricCloud\VolumetricCloud\Main.cpp(53,46): warning C4244: 'initializing': conversion from 'double' to 'GLuint', possible loss of data
-F:\Trinity\Dissertation\Project\VolumetricCloud\VolumetricCloud\Main.cpp(200,30): warning C4244: 'initializing': conversion from 'double' to 'GLfloat', possible loss of data
-F:\Trinity\Dissertation\Project\VolumetricCloud\VolumetricCloud\Main.cpp(409,17): warning C4244: '=': conversion from 'double' to 'GLfloat', possible loss of data
-F:\Trinity\Dissertation\Project\VolumetricCloud\VolumetricCloud\Main.cpp(410,17): warning C4244: '=': conversion from 'double' to 'GLfloat', possible loss of data
-F:\Trinity\Dissertation\Project\VolumetricCloud\VolumetricCloud\Main.cpp(414,21): warning C4244: 'initializing': conversion from 'double' to 'GLfloat', possible loss of data
-F:\Trinity\Dissertation\Project\VolumetricCloud\VolumetricCloud\Main.cpp(415,21): warning C4244: 'initializing': conversion from 'double' to 'GLfloat', possible loss of data
-F:\Trinity\Dissertation\Project\VolumetricCloud\VolumetricCloud\Main.cpp(417,13): warning C4244: '=': conversion from 'double' to 'GLfloat', possible loss of data
-F:\Trinity\Dissertation\Project\VolumetricCloud\VolumetricCloud\Main.cpp(418,13): warning C4244: '=': conversion from 'double' to 'GLfloat', possible loss of data
-F:\Trinity\Dissertation\Project\VolumetricCloud\VolumetricCloud\Main.cpp(431,31): warning C4244: 'argument': conversion from 'double' to 'float', possible loss of data
-F:\Trinity\Dissertation\Project\VolumetricCloud\VolumetricCloud\Main.cpp(535,63): warning C4244: 'argument': conversion from 'float' to 'GLsizei', possible loss of data
-F:\Trinity\Dissertation\Project\VolumetricCloud\VolumetricCloud\Main.cpp(535,55): warning C4244: 'argument': conversion from 'float' to 'GLsizei', possible loss of data
-F:\Trinity\Dissertation\Project\VolumetricCloud\VolumetricCloud\Main.cpp(535,48): warning C4244: 'argument': conversion from 'float' to 'GLsizei', possible loss of data
-F:\Trinity\Dissertation\Project\VolumetricCloud\VolumetricCloud\Main.cpp(556,66): warning C4305: 'initializing': truncation from 'double' to 'float'
-F:\Trinity\Dissertation\Project\VolumetricCloud\VolumetricCloud\Main.cpp(557,17): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
+﻿  Main.cpp
+F:\Trinity\Dissertation\Project\VolumetricCloud\VolumetricCloud\Main.cpp(224,30): warning C4244: 'initializing': conversion from 'double' to 'GLfloat', possible loss of data
+F:\Trinity\Dissertation\Project\VolumetricCloud\VolumetricCloud\Main.cpp(450,21): warning C4244: '=': conversion from 'double' to 'GLfloat', possible loss of data
+F:\Trinity\Dissertation\Project\VolumetricCloud\VolumetricCloud\Main.cpp(451,21): warning C4244: '=': conversion from 'double' to 'GLfloat', possible loss of data
+F:\Trinity\Dissertation\Project\VolumetricCloud\VolumetricCloud\Main.cpp(455,25): warning C4244: 'initializing': conversion from 'double' to 'GLfloat', possible loss of data
+F:\Trinity\Dissertation\Project\VolumetricCloud\VolumetricCloud\Main.cpp(456,25): warning C4244: 'initializing': conversion from 'double' to 'GLfloat', possible loss of data
+F:\Trinity\Dissertation\Project\VolumetricCloud\VolumetricCloud\Main.cpp(458,17): warning C4244: '=': conversion from 'double' to 'GLfloat', possible loss of data
+F:\Trinity\Dissertation\Project\VolumetricCloud\VolumetricCloud\Main.cpp(459,17): warning C4244: '=': conversion from 'double' to 'GLfloat', possible loss of data
+F:\Trinity\Dissertation\Project\VolumetricCloud\VolumetricCloud\Main.cpp(475,31): warning C4244: 'argument': conversion from 'double' to 'float', possible loss of data
+F:\Trinity\Dissertation\Project\VolumetricCloud\VolumetricCloud\Main.cpp(583,63): warning C4244: 'argument': conversion from 'float' to 'GLsizei', possible loss of data
+F:\Trinity\Dissertation\Project\VolumetricCloud\VolumetricCloud\Main.cpp(583,55): warning C4244: 'argument': conversion from 'float' to 'GLsizei', possible loss of data
+F:\Trinity\Dissertation\Project\VolumetricCloud\VolumetricCloud\Main.cpp(583,48): warning C4244: 'argument': conversion from 'float' to 'GLsizei', possible loss of data
+F:\Trinity\Dissertation\Project\VolumetricCloud\VolumetricCloud\Main.cpp(604,66): warning C4305: 'initializing': truncation from 'double' to 'float'
+F:\Trinity\Dissertation\Project\VolumetricCloud\VolumetricCloud\Main.cpp(605,17): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
 LINK : warning LNK4098: defaultlib 'LIBCMT' conflicts with use of other libs; use /NODEFAULTLIB:library
   Generating code
-  Previous IPDB and IOBJ mismatch, fall back to full compilation.
-  All 1639 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
+  1 of 2275 functions (<0.1%) were compiled, the rest were copied from previous compilation.
+    0 functions were new in current compilation
+    29 functions had inline decision re-evaluated but remain unchanged
   Finished generating code
+LINK : warning LNK4286: symbol '___glewGenBuffers' defined in 'glew32s.lib(glew.obj)' is imported by 'Mesh.obj'
+LINK : warning LNK4286: symbol '___glewGenVertexArrays' defined in 'glew32s.lib(glew.obj)' is imported by 'Mesh.obj'
+LINK : warning LNK4286: symbol '___glewActiveTexture' defined in 'glew32s.lib(glew.obj)' is imported by 'Mesh.obj'
+LINK : warning LNK4286: symbol '___glewBufferData' defined in 'glew32s.lib(glew.obj)' is imported by 'Mesh.obj'
+LINK : warning LNK4286: symbol '___glewBindBuffer' defined in 'glew32s.lib(glew.obj)' is imported by 'Mesh.obj'
+LINK : warning LNK4286: symbol '___glewVertexAttribPointer' defined in 'glew32s.lib(glew.obj)' is imported by 'Mesh.obj'
+LINK : warning LNK4286: symbol '___glewBindVertexArray' defined in 'glew32s.lib(glew.obj)' is imported by 'Mesh.obj'
+LINK : warning LNK4286: symbol '___glewEnableVertexAttribArray' defined in 'glew32s.lib(glew.obj)' is imported by 'Mesh.obj'
+LINK : warning LNK4286: symbol '___glewGenerateMipmap' defined in 'glew32s.lib(glew.obj)' is imported by 'Model.obj'
 glew32s.lib(glew.obj) : warning LNK4099: PDB 'vc120.pdb' was not found with 'glew32s.lib(glew.obj)' or at 'F:\Trinity\Dissertation\Project\VolumetricCloud\Release\vc120.pdb'; linking object as if no debug info
   VolumetricCloud.vcxproj -> F:\Trinity\Dissertation\Project\VolumetricCloud\Release\VolumetricCloud.exe

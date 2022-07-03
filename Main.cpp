@@ -10,14 +10,18 @@
 #include <gtc/matrix_transform.hpp>
 #include <gtc/type_ptr.hpp>
 #include <gtx/string_cast.hpp>
-#define STB_IMAGE_IMPLEMENTATION
-#include "stb_image.h"
-#include "imgui/imgui.h" // Configure imgui 1/5, remember to exclude main.cpp in imgui folder
+#include "imgui/imgui.h" // Configure ImGUI 1/5
 #include "imgui/imgui_impl_glfw.h"
 #include "imgui/imgui_impl_opengl3.h"
 
 #include "Shader.h"
 #include "Camera.h"
+#include "Model.h"
+#include "LightDirectional.h"
+
+// import stb_image shoule be after model.h
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
 
 void keyCallBack(GLFWwindow* window, int key, int scancode, int action, int mode);
 void scrollCallback(GLFWwindow* window, double xoffset, double yoffset);
@@ -49,8 +53,8 @@ GLfloat startTime = 0.0f;
 
 #pragma region Window Attribution
 // Window dimensions
-//const GLuint WIDTH = 1280, HEIGHT = 720;
-const GLuint WIDTH = 512 * 2.0, HEIGHT = 512 * 2.0; // if the window is not square, some antefacts show up
+const GLuint WIDTH = 1280, HEIGHT = 720;  // both the width and height should be multiple of 16
+//const GLuint WIDTH = 512 * 3.0, HEIGHT = 512 * 2.0; // if the window is not square, some antefacts show up
 const GLuint downscale = 4; //4 is best//any more and the gains dont make up for the lag
 GLuint downscalesq = downscale * downscale;
 GLfloat ASPECT = float(WIDTH) / float(HEIGHT);
@@ -77,7 +81,7 @@ int main()
     glfwSetKeyCallback(window, keyCallBack);
 
     glfwSetWindowPos(window, 200, 17);//so you can see frame rate
-    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    //glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     glfwSwapInterval(0);//turn off vsync
 
     //GLEW init
@@ -93,6 +97,18 @@ int main()
     Shader ourShader("sky.vert", "sky.frag");
     Shader postShader("tex.vert", "tex.frag");
     Shader upscaleShader("upscale.vert", "upscale.frag");
+    Shader shaderBlinnPhong("VertexShader_blinnPhong.vert", "FragmentShader_blinnPhong.frag");
+#pragma endregion
+
+#pragma region Light Declaration
+    LightDirectional lightD(glm::vec3(10.0f, 30.0f, 20.0f), glm::vec3(glm::radians(110.0f), glm::radians(30.0f), 0), glm::vec3(1.0f, 0.95f, 0.8f));
+#pragma endregion
+
+#pragma region Pass light to shaders;
+    shaderBlinnPhong.use();
+    shaderBlinnPhong.setUniform3f("lightD.pos", glm::vec3(lightD.position.x, lightD.position.y, lightD.position.z));
+    shaderBlinnPhong.setUniform3f("lightD.color", glm::vec3(lightD.color.x, lightD.color.y, lightD.color.z));
+    shaderBlinnPhong.setUniform3f("lightD.dirToLight", glm::vec3(lightD.direction.x, lightD.direction.y, lightD.direction.z));
 #pragma endregion
 
 #pragma region Triagnle Vertices
@@ -176,6 +192,10 @@ int main()
     perlworltex = loadTexture3D("assets/perlworlnoise.tga", 128, 128, 128);
 #pragma endregion 
 
+#pragma region Load Models
+    Model bunny(".\\model\\bunny\\bunny.obj");
+#pragma endregion
+
 #pragma region MVP Matrix Declaration
     //set up Model-View-Projection matrix
     //this way you only update when camera moves
@@ -186,13 +206,17 @@ int main()
     MVPM = projection * view;
 #pragma endregion
 
-    // Configure imgui 2/5
+#pragma region Configure ImGUI
+    // Configure ImGUI 2/5
     const char* glsl_version = "#version 130";
     ImGui::CreateContext();
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init(glsl_version);
     ImGui::StyleColorsDark();
-    
+#pragma endregion
+
+    ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+
     int check = 0; // used for checkerboarding in the upscale shader
     while (!glfwWindowShouldClose(window))
     {
@@ -208,7 +232,7 @@ int main()
             startTime = timePassed;
             frames = 0;
         }
-
+        
         /*glm::mat4 newMat = glm::inverse(view) * (glm::inverse(projection) * projection) * view;
         glm::mat4 newMat2 = glm::inverse(view) * glm::inverse(projection) * projection * view;
         glm::mat4 newMatView = glm::inverse(view) * view;
@@ -301,7 +325,7 @@ int main()
         glBindVertexArray(0);
 
 
-        // Configure 3/5 
+        // Configure ImGUI 3/5
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
@@ -311,7 +335,9 @@ int main()
             //ImGui::Checkbox("Show effect with Normal Mapping", &displayBump);
             //ImGui::Checkbox("Rotate the point light", &rotateLight);
             //ImGui::SliderFloat("Light distance", &lightPosScaleRate, 0.3f, 1.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
-
+            ImGui::SliderFloat("Camera speed", &(camera.MovementSpeed), 0.1f, 1000.0f);
+            ImGui::ColorEdit3("clear color", (float*)&clear_color);
+            ImGui::Text("Position (%.1f, %.1f, %.1f)", camera.Position.x, camera.Position.y, camera.Position.z);
             ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
             ImGui::End();
         }
@@ -367,7 +393,20 @@ int main()
         glDrawArrays(GL_TRIANGLES, 0, 3);
         glBindVertexArray(0);
 
-        // Configure imgui 4/5
+
+#pragma region Draw Bunny
+        shaderBlinnPhong.use();
+        glm::mat4 modelMat = glm::scale(glm::mat4(1.0f), glm::vec3(0.1f, 0.1f, 0.1f));
+        modelMat = glm::translate(modelMat, glm::vec3(0.0f, 5.0f, -20.0f));
+        shaderBlinnPhong.setUniformMatrix("modelMat", modelMat);
+        shaderBlinnPhong.setUniformMatrix("viewMat", view);
+        shaderBlinnPhong.setUniformMatrix("projMat", projection);
+
+        bunny.Draw(&shaderBlinnPhong);
+#pragma endregion
+
+
+        // Configure ImGUI 4/5
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
@@ -376,7 +415,7 @@ int main()
         check++;
     }
     
-    // Configure imgui 5/5
+    // Configure ImGUI 5/5
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();
@@ -404,21 +443,26 @@ int main()
 
 void mouseCallback(GLFWwindow* window, double xpos, double ypos)
 {
-    if (firstMouse)
+    if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS)
     {
+        if (firstMouse)
+        {
+            lastX = xpos;
+            lastY = ypos;
+            firstMouse = false;
+        }
+
+        GLfloat xoffset = xpos - lastX;
+        GLfloat yoffset = lastY - ypos;  // Reversed since y-coordinates go from bottom to left
+
         lastX = xpos;
         lastY = ypos;
-        firstMouse = false;
+
+        camera.processMouseMovement(xoffset, yoffset);
     }
 
-    GLfloat xoffset = xpos - lastX;
-    GLfloat yoffset = lastY - ypos;  // Reversed since y-coordinates go from bottom to left
-
-    lastX = xpos;
-    lastY = ypos;
-
-    camera.processMouseMovement(xoffset, yoffset);
-
+    if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_RELEASE)
+        firstMouse = true;
     /*glm::mat4 view;
     view = camera.getViewMatrix();
     glm::mat4 projection;
@@ -429,12 +473,6 @@ void mouseCallback(GLFWwindow* window, double xpos, double ypos)
 void scrollCallback(GLFWwindow* window, double xoffset, double yoffset)
 {
     camera.processMouseScroll(yoffset);
-
-    /*glm::mat4 view;
-    view = camera.getViewMatrix();
-    glm::mat4 projection;
-    projection = glm::perspective(glm::radians(camera.Zoom), (float)WIDTH / (float)HEIGHT, 0.1f, 1000.0f);
-    MVPM = projection * view;*/
 }
 
 void keyCallBack(GLFWwindow* window, int key, int scancode, int action, int mode)
@@ -451,24 +489,34 @@ void keyCallBack(GLFWwindow* window, int key, int scancode, int action, int mode
             keys[key] = false;
     }*/
 
-    // the movement of the camera has problems
-    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+    if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS)
     {
-        camera.processKeyboard(Camera_Movement::FORWARD, deltaTime, 1000);
+        // the movement of the camera has problems
+        if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+        {
+            camera.processKeyboard(Camera_Movement::FORWARD, deltaTime, camera.MovementSpeed);
+        }
+        if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+        {
+            camera.processKeyboard(Camera_Movement::BACKWARD, deltaTime, camera.MovementSpeed);
+        }
+        if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+        {
+            camera.processKeyboard(Camera_Movement::LEFT, deltaTime, camera.MovementSpeed);
+        }
+        if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+        {
+            camera.processKeyboard(Camera_Movement::RIGHT, deltaTime, camera.MovementSpeed);
+        }
+        if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS)
+        {
+            camera.processKeyboard(Camera_Movement::UP, deltaTime, camera.MovementSpeed);
+        }
+        if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS)
+        {
+            camera.processKeyboard(Camera_Movement::DOWN, deltaTime, camera.MovementSpeed);
+        }
     }
-    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-    {
-        camera.processKeyboard(Camera_Movement::BACKWARD, deltaTime, 1000);
-    }
-    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-    {
-        camera.processKeyboard(Camera_Movement::LEFT, deltaTime, 1000);
-    }
-    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-    {
-        camera.processKeyboard(Camera_Movement::RIGHT, deltaTime, 1000);
-    }
-
 }
 
 unsigned int loadTexture2D(const std::string& path, bool gamma)

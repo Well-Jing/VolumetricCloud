@@ -105,15 +105,15 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>F:\OpenGL\GLM\glm-0.9.8.5\glm\glm;F:\OpenGL\GLEW\glew-2.1.0-win32\glew-2.1.0\include;F:\OpenGL\GLFW\glfw-3.3.2.bin.WIN32\glfw-3.3.2.bin.WIN32\include;F:\OpenGL\Assimp5.0.0\cmake_built\include;F:\OpenGL\GLAD\glad\include;F:\OpenGL\ImGUI\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>F:\OpenGL\GLM\glm-0.9.8.5\glm\glm;F:\OpenGL\GLEW\glew-2.1.0-win32\glew-2.1.0\include;F:\OpenGL\GLFW\glfw-3.3.2.bin.WIN32\glfw-3.3.2.bin.WIN32\include;F:\OpenGL\Assimp-vs2019\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>opengl32.lib;glfw3.lib;glew32s.lib;assimp-vc141-mtd.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>F:\OpenGL\GLEW\glew-2.1.0-win32\glew-2.1.0\lib\Release\Win32;F:\OpenGL\GLFW\glfw-3.3.2.bin.WIN32\glfw-3.3.2.bin.WIN32\lib-vc2017;F:\OpenGL\Assimp5.0.0\cmake_built\libdll;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>opengl32.lib;glfw3.lib;glew32s.lib;assimp-vc142-mt.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>F:\OpenGL\GLEW\glew-2.1.0-win32\glew-2.1.0\lib\Release\Win32;F:\OpenGL\GLFW\glfw-3.3.2.bin.WIN32\glfw-3.3.2.bin.WIN32\lib-vc2017;F:\OpenGL\Assimp-vs2019\libdll;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -159,16 +159,22 @@
     <ClCompile Include="ImGUI\imgui_impl_opengl3.cpp" />
     <ClCompile Include="ImGUI\imgui_tables.cpp" />
     <ClCompile Include="ImGUI\imgui_widgets.cpp" />
+    <ClCompile Include="LightDirectional.cpp" />
     <ClCompile Include="Main.cpp" />
+    <ClCompile Include="Material.cpp" />
+    <ClCompile Include="Mesh.cpp" />
+    <ClCompile Include="Model.cpp" />
     <ClCompile Include="Shader.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="FragmentShader_blinnPhong.frag" />
     <None Include="sky.frag" />
     <None Include="sky.vert" />
     <None Include="tex.frag" />
     <None Include="tex.vert" />
     <None Include="upscale.frag" />
     <None Include="upscale.vert" />
+    <None Include="VertexShader_blinnPhong.vert" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Camera.h" />
@@ -181,6 +187,10 @@
     <ClInclude Include="ImGUI\imstb_rectpack.h" />
     <ClInclude Include="ImGUI\imstb_textedit.h" />
     <ClInclude Include="ImGUI\imstb_truetype.h" />
+    <ClInclude Include="LightDirectional.h" />
+    <ClInclude Include="Material.h" />
+    <ClInclude Include="Mesh.h" />
+    <ClInclude Include="Model.h" />
     <ClInclude Include="Shader.h" />
     <ClInclude Include="stb_image.h" />
   </ItemGroup>

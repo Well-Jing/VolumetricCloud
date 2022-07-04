@@ -23,13 +23,14 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
-void keyCallBack(GLFWwindow* window, int key, int scancode, int action, int mode);
+#pragma region Function Declaration
+void keyCallBack(GLFWwindow* window);
 void scrollCallback(GLFWwindow* window, double xoffset, double yoffset);
 void mouseCallback(GLFWwindow* window, double xpos, double ypos);
 unsigned int loadTexture2D(const std::string& path, bool gamma = true);
 unsigned int loadTexture3D(const std::string& path, float width, float height, float depth, bool gamma = true);
 glm::vec3 getSunPosition(float time);
-
+#pragma endregion
 
 #pragma region Camera Creation and Attribution
 // Camera
@@ -64,7 +65,6 @@ GLfloat ASPECT = float(WIDTH) / float(HEIGHT);
 // The MAIN function, from here we start the application and run the game loop
 int main()
 {
-    
 #pragma region Create Window
     glfwInit();
     
@@ -78,7 +78,7 @@ int main()
 
     glfwSetCursorPosCallback(window, mouseCallback);
     glfwSetScrollCallback(window, scrollCallback);
-    glfwSetKeyCallback(window, keyCallBack);
+    //glfwSetKeyCallback(window, keyCallBack);
 
     glfwSetWindowPos(window, 200, 17);//so you can see frame rate
     //glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
@@ -88,16 +88,19 @@ int main()
     glewExperimental = GL_TRUE;
     glewInit();
 
+    glEnable(GL_CULL_FACE);
+    glEnable(GL_DEPTH_TEST);
+
     //not sure this is necessary?
     glViewport(0, 0, WIDTH, HEIGHT);
 #pragma endregion
     
 #pragma region Create Shader
     //Shader class built on the one in learnopengl.com
-    Shader ourShader("sky.vert", "sky.frag");
-    Shader postShader("tex.vert", "tex.frag");
-    Shader upscaleShader("upscale.vert", "upscale.frag");
-    Shader shaderBlinnPhong("VertexShader_blinnPhong.vert", "FragmentShader_blinnPhong.frag");
+    Shader skyShader("VertexShader_sky.vert", "FragmentShader_sky.frag");
+    Shader upscaleShader("VertexShader_upscale.vert", "FragmentShader_upscale.frag");
+    Shader postShader("VertexShader_postprocess.vert", "FragmentShader_postprocess.frag");
+    Shader blinnPhongShader("VertexShader_blinnPhong.vert", "FragmentShader_blinnPhong.frag");
 #pragma endregion
 
 #pragma region Light Declaration
@@ -105,10 +108,10 @@ int main()
 #pragma endregion
 
 #pragma region Pass light to shaders;
-    shaderBlinnPhong.use();
-    shaderBlinnPhong.setUniform3f("lightD.pos", glm::vec3(lightD.position.x, lightD.position.y, lightD.position.z));
-    shaderBlinnPhong.setUniform3f("lightD.color", glm::vec3(lightD.color.x, lightD.color.y, lightD.color.z));
-    shaderBlinnPhong.setUniform3f("lightD.dirToLight", glm::vec3(lightD.direction.x, lightD.direction.y, lightD.direction.z));
+    blinnPhongShader.use();
+    blinnPhongShader.setUniform3f("lightD.pos", glm::vec3(lightD.position.x, lightD.position.y, lightD.position.z));
+    blinnPhongShader.setUniform3f("lightD.color", glm::vec3(lightD.color.x, lightD.color.y, lightD.color.z));
+    blinnPhongShader.setUniform3f("lightD.dirToLight", glm::vec3(lightD.direction.x, lightD.direction.y, lightD.direction.z));
 #pragma endregion
 
 #pragma region Triagnle Vertices
@@ -117,6 +120,11 @@ int main()
        -1.0f,  3.0f,
         3.0f, -1.0f,
     };
+#pragma endregion
+
+#pragma region Load Models
+    Model bunny(".\\model\\bunny\\bunny.obj");
+    Model ground(".\\model\\ground\\ground.obj");
 #pragma endregion
 
 #pragma region Buffer Creation
@@ -192,10 +200,6 @@ int main()
     perlworltex = loadTexture3D("assets/perlworlnoise.tga", 128, 128, 128);
 #pragma endregion 
 
-#pragma region Load Models
-    Model bunny(".\\model\\bunny\\bunny.obj");
-#pragma endregion
-
 #pragma region MVP Matrix Declaration
     //set up Model-View-Projection matrix
     //this way you only update when camera moves
@@ -213,9 +217,13 @@ int main()
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init(glsl_version);
     ImGui::StyleColorsDark();
+    ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 #pragma endregion
 
-    ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+    
+    camera.MovementSpeed = 20;
+    glm::vec3 sunPos;
+    float sunTime = 1.0;
 
     int check = 0; // used for checkerboarding in the upscale shader
     while (!glfwWindowShouldClose(window))
@@ -266,17 +274,11 @@ int main()
 
         LFMVPM = MVPM; // copy last MVP matrix for use in frame reprojection
 
-        // check camera movement
-        glfwPollEvents();
-
         // update MVP matrix
         view = camera.getViewMatrix();
         projection = glm::perspective(glm::radians(camera.Zoom), (float)WIDTH / (float)HEIGHT, 0.1f, 1000.0f);
         MVPM = projection * view;
-        //invMVPM = glm::inverse(MVPM);
-        invMVPM = glm::inverse(view) * glm::inverse(projection);
-        //glm::mat4 newMat = invMVPM * MVPM;
-        
+        //invMVPM = glm::inverse(view) * glm::inverse(projection);   
 
         // check for errors TODO wrap in a define DEBUG
         GLenum err;
@@ -285,32 +287,55 @@ int main()
             std::cout << err << std::endl;
         }
 
+        keyCallBack(window);
+        glCullFace(GL_FRONT);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+
+        // Configure ImGUI 3/5
+        ImGui_ImplOpenGL3_NewFrame();
+        ImGui_ImplGlfw_NewFrame();
+        ImGui::NewFrame();
+        {
+            ImGui::Begin("ImGUI interface");                          // Create a window called "Hello, world!" and append into it.
+
+            //ImGui::Checkbox("Show effect with Normal Mapping", &displayBump);
+            //ImGui::Checkbox("Rotate the point light", &rotateLight);
+            //ImGui::SliderFloat("Light distance", &lightPosScaleRate, 0.3f, 1.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
+            ImGui::SliderFloat("Camera speed", &(camera.MovementSpeed), 0.1f, 1000.0f);
+            ImGui::SliderFloat("Sun time", &sunTime, 0.0f, 35.0f);
+            ImGui::ColorEdit3("clear color", (float*)&clear_color);
+            ImGui::Text("Position (%.1f, %.1f, %.1f)", camera.Position.x, camera.Position.y, camera.Position.z);
+            ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+            ImGui::End();
+        }
+
 
         // Write to quarter scale buffer (1/16 sized)
         glBindFramebuffer(GL_FRAMEBUFFER, subbuffer);  // bind fbo, the draw texture is 
         glViewport(0, 0, WIDTH / downscale, HEIGHT / downscale);  // now the downscale is 4, 1/16 sized image
+        glDepthMask(GL_FALSE);
+        skyShader.use();
+        skyShader.setUniform1i("check", check % downscalesq);
+        skyShader.setUniform1f("time", timePassed);
+        skyShader.setUniform1f("aspect", ASPECT);
+        skyShader.setUniform1f("downscale", (float)downscale);
+        skyShader.setUniform2f("resolution", glm::vec2((float)WIDTH, (float)HEIGHT));
+        skyShader.setUniform3f("cameraPos", camera.Position);
+        skyShader.setUniformMatrix("MVPM", MVPM);
+        skyShader.setUniformMatrix("invMVPM", invMVPM);
+        skyShader.setUniformMatrix("invView", glm::inverse(view));
+        skyShader.setUniformMatrix("invProj", glm::inverse(projection));
 
-        ourShader.use();
-        ourShader.setUniform1i("check", check % downscalesq);
-        ourShader.setUniform1f("time", timePassed);
-        ourShader.setUniform1f("aspect", ASPECT);
-        ourShader.setUniform1f("downscale", (float)downscale);
-        ourShader.setUniform2f("resolution", glm::vec2((float)WIDTH, (float)HEIGHT));
-        ourShader.setUniform3f("cameraPos", camera.Position);
-        ourShader.setUniformMatrix("MVPM", MVPM);
-        ourShader.setUniformMatrix("invMVPM", invMVPM);
-        ourShader.setUniformMatrix("invView", glm::inverse(view));
-        ourShader.setUniformMatrix("invProj", glm::inverse(projection));
-
-        //glm::vec3 sunPos = getSunPosition(timePassed);
-        glm::vec3 sunPos = getSunPosition(1);
-        ourShader.setUniform3f("sunPosition", sunPos);
+        //sunPos = getSunPosition(timePassed);
+        sunPos = getSunPosition(sunTime);
+        skyShader.setUniform3f("sunDirection", sunPos);
 
         // set textures (weather + noise)
-        ourShader.setUniform1i("perlworl", 0);
-        ourShader.setUniform1i("worl", 1);
-        ourShader.setUniform1i("curl", 2);
-        ourShader.setUniform1i("weather", 3);
+        skyShader.setUniform1i("perlworl", 0);
+        skyShader.setUniform1i("worl", 1);
+        skyShader.setUniform1i("curl", 2);
+        skyShader.setUniform1i("weather", 3);
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_3D, perlworltex);
         glActiveTexture(GL_TEXTURE1);
@@ -325,22 +350,7 @@ int main()
         glBindVertexArray(0);
 
 
-        // Configure ImGUI 3/5
-        ImGui_ImplOpenGL3_NewFrame();
-        ImGui_ImplGlfw_NewFrame();
-        ImGui::NewFrame();
-        {
-            ImGui::Begin("ImGUI interface");                          // Create a window called "Hello, world!" and append into it.
-
-            //ImGui::Checkbox("Show effect with Normal Mapping", &displayBump);
-            //ImGui::Checkbox("Rotate the point light", &rotateLight);
-            //ImGui::SliderFloat("Light distance", &lightPosScaleRate, 0.3f, 1.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
-            ImGui::SliderFloat("Camera speed", &(camera.MovementSpeed), 0.1f, 1000.0f);
-            ImGui::ColorEdit3("clear color", (float*)&clear_color);
-            ImGui::Text("Position (%.1f, %.1f, %.1f)", camera.Position.x, camera.Position.y, camera.Position.z);
-            ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
-            ImGui::End();
-        }
+        
 
         // upscale the buffer into full size framebuffer
         glBindFramebuffer(GL_FRAMEBUFFER, fbo);
@@ -392,19 +402,30 @@ int main()
         glBindVertexArray(VAO);
         glDrawArrays(GL_TRIANGLES, 0, 3);
         glBindVertexArray(0);
-
+        glDepthMask(GL_TRUE);
 
 #pragma region Draw Bunny
-        shaderBlinnPhong.use();
-        glm::mat4 modelMat = glm::scale(glm::mat4(1.0f), glm::vec3(0.1f, 0.1f, 0.1f));
-        modelMat = glm::translate(modelMat, glm::vec3(0.0f, 5.0f, -20.0f));
-        shaderBlinnPhong.setUniformMatrix("modelMat", modelMat);
-        shaderBlinnPhong.setUniformMatrix("viewMat", view);
-        shaderBlinnPhong.setUniformMatrix("projMat", projection);
+        glCullFace(GL_BACK);
+        blinnPhongShader.use();
+        glm::mat4 modelMat = glm::scale(glm::mat4(1.0f), glm::vec3(1.0f, 1.0f, 1.0f));
+        modelMat = glm::translate(modelMat, glm::vec3(0.0f, 0.0f, -20.0f));
+        blinnPhongShader.setUniformMatrix("modelMat", modelMat);
+        blinnPhongShader.setUniformMatrix("viewMat", view);
+        blinnPhongShader.setUniformMatrix("projMat", projection);
 
-        bunny.Draw(&shaderBlinnPhong);
+        bunny.Draw(&blinnPhongShader);
 #pragma endregion
 
+#pragma region Draw Ground
+        blinnPhongShader.use();
+        modelMat = glm::scale(glm::mat4(1.0f), glm::vec3(100.0f, 1.0f, 100.0f));
+        modelMat = glm::translate(modelMat, glm::vec3(0.0f, -0.5f, 0.0f));
+        blinnPhongShader.setUniformMatrix("modelMat", modelMat);
+        blinnPhongShader.setUniformMatrix("viewMat", view);
+        blinnPhongShader.setUniformMatrix("projMat", projection);
+
+        ground.Draw(&blinnPhongShader);
+#pragma endregion
 
         // Configure ImGUI 4/5
         ImGui::Render();
@@ -412,6 +433,8 @@ int main()
 
         // Swap the screen buffers
         glfwSwapBuffers(window);
+        // check camera movement
+        glfwPollEvents();
         check++;
     }
     
@@ -441,6 +464,8 @@ int main()
     
 }
 
+
+#pragma region Functions
 void mouseCallback(GLFWwindow* window, double xpos, double ypos)
 {
     if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS)
@@ -475,10 +500,9 @@ void scrollCallback(GLFWwindow* window, double xoffset, double yoffset)
     camera.processMouseScroll(yoffset);
 }
 
-void keyCallBack(GLFWwindow* window, int key, int scancode, int action, int mode)
+void keyCallBack(GLFWwindow* window)
 {
-    if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
-        glfwSetWindowShouldClose(window, GL_TRUE);
+    
 
     // this might be useful in the future
     /*if (key >= 0 && key < 1024)
@@ -489,32 +513,35 @@ void keyCallBack(GLFWwindow* window, int key, int scancode, int action, int mode
             keys[key] = false;
     }*/
 
+    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
+        glfwSetWindowShouldClose(window, GL_TRUE);
+
     if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS)
     {
         // the movement of the camera has problems
         if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
         {
-            camera.processKeyboard(Camera_Movement::FORWARD, deltaTime, camera.MovementSpeed);
+            camera.processKeyboard(Camera_Movement::FORWARD, deltaTime);
         }
-        if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+        else if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
         {
-            camera.processKeyboard(Camera_Movement::BACKWARD, deltaTime, camera.MovementSpeed);
+            camera.processKeyboard(Camera_Movement::BACKWARD, deltaTime);
         }
         if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
         {
-            camera.processKeyboard(Camera_Movement::LEFT, deltaTime, camera.MovementSpeed);
+            camera.processKeyboard(Camera_Movement::LEFT, deltaTime);
         }
-        if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+        else if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
         {
-            camera.processKeyboard(Camera_Movement::RIGHT, deltaTime, camera.MovementSpeed);
+            camera.processKeyboard(Camera_Movement::RIGHT, deltaTime);
         }
         if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS)
         {
-            camera.processKeyboard(Camera_Movement::UP, deltaTime, camera.MovementSpeed);
+            camera.processKeyboard(Camera_Movement::UP, deltaTime);
         }
-        if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS)
+        else if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS)
         {
-            camera.processKeyboard(Camera_Movement::DOWN, deltaTime, camera.MovementSpeed);
+            camera.processKeyboard(Camera_Movement::DOWN, deltaTime);
         }
     }
 }
@@ -583,6 +610,8 @@ unsigned int loadTexture3D(const std::string& path, float width, float height, f
         glTexImage3D(GL_TEXTURE_3D, 0, format, width, height, depth, 0, format, GL_UNSIGNED_BYTE, data);
         glGenerateMipmap(GL_TEXTURE_3D);
 
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_REPEAT);
         glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
         glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
@@ -610,3 +639,4 @@ glm::vec3 getSunPosition(float time)
 
     return glm::vec3(sunposx, sunposy, sunposz);
 }
+#pragma endregion

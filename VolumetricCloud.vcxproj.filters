@@ -65,12 +65,12 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <None Include="sky.frag" />
-    <None Include="sky.vert" />
-    <None Include="tex.frag" />
-    <None Include="tex.vert" />
-    <None Include="upscale.frag" />
-    <None Include="upscale.vert" />
+    <None Include="FragmentShader_sky.frag" />
+    <None Include="VertexShader_sky.vert" />
+    <None Include="FragmentShader_postprocess.frag" />
+    <None Include="VertexShader_postprocess.vert" />
+    <None Include="FragmentShader_upscale.frag" />
+    <None Include="VertexShader_upscale.vert" />
     <None Include="FragmentShader_blinnPhong.frag" />
     <None Include="VertexShader_blinnPhong.vert" />
   </ItemGroup>

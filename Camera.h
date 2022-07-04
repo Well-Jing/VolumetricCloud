@@ -52,7 +52,7 @@ public:
     glm::mat4 getViewMatrix();
 
     // processes input received from any keyboard-like input system. Accepts input parameter in the form of camera defined ENUM (to abstract it from windowing systems)
-    void processKeyboard(Camera_Movement direction, float deltaTime, float accelerate);
+    void processKeyboard(Camera_Movement direction, float deltaTime);
 
     // processes input received from a mouse input system. Expects the offset value in both the x and y direction.
     void processMouseMovement(float xoffset, float yoffset, GLboolean constrainPitch = true);

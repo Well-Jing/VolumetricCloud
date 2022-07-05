@@ -75,6 +75,7 @@ int main()
 
     GLFWwindow* window = glfwCreateWindow(WIDTH, HEIGHT, "Realtime Clouds", NULL, NULL);
     glfwMakeContextCurrent(window);
+    glfwSwapInterval(0);
 
     glfwSetCursorPosCallback(window, mouseCallback);
     glfwSetScrollCallback(window, scrollCallback);
@@ -222,12 +223,19 @@ int main()
 
     
     camera.MovementSpeed = 20;
+    float cloudRenderTime = 0;
+    float cloudRenderStart;
+    float cloudRenderSum = 0;
+    int cloudRenderConter = 0;
+    float timeStamp[10];
+
     glm::vec3 sunPos;
     float sunTime = 1.0;
 
     int check = 0; // used for checkerboarding in the upscale shader
     while (!glfwWindowShouldClose(window))
     {
+        
         // This block measures frame time in ms or fps
         GLfloat currentFrame = glfwGetTime();
         deltaTime = currentFrame - lastFrame;
@@ -267,8 +275,6 @@ int main()
             std::cout << "==================================================================" << std::endl;
         }*/
 
-
-
         lastFrame = currentFrame;
         frames++;
 
@@ -279,18 +285,17 @@ int main()
         projection = glm::perspective(glm::radians(camera.Zoom), (float)WIDTH / (float)HEIGHT, 0.1f, 1000.0f);
         MVPM = projection * view;
         //invMVPM = glm::inverse(view) * glm::inverse(projection);   
-
+        
         // check for errors TODO wrap in a define DEBUG
-        GLenum err;
+        /*GLenum err;
         while ((err = glGetError()) != GL_NO_ERROR)
         {
             std::cout << err << std::endl;
-        }
-
+        }*/
+        
         keyCallBack(window);
         glCullFace(GL_FRONT);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
 
         // Configure ImGUI 3/5
         ImGui_ImplOpenGL3_NewFrame();
@@ -305,15 +310,16 @@ int main()
             ImGui::SliderFloat("Camera speed", &(camera.MovementSpeed), 0.1f, 1000.0f);
             ImGui::SliderFloat("Sun time", &sunTime, 0.0f, 35.0f);
             ImGui::ColorEdit3("clear color", (float*)&clear_color);
+            ImGui::Text("Cloud render time %f ms/frame", cloudRenderTime);
             ImGui::Text("Position (%.1f, %.1f, %.1f)", camera.Position.x, camera.Position.y, camera.Position.z);
             ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
             ImGui::End();
         }
 
-
-        // Write to quarter scale buffer (1/16 sized)
+        // Write to quarter scaled buffer (1/16 scaled)
+        cloudRenderStart = glfwGetTime();
         glBindFramebuffer(GL_FRAMEBUFFER, subbuffer);  // bind fbo, the draw texture is 
-        glViewport(0, 0, WIDTH / downscale, HEIGHT / downscale);  // now the downscale is 4, 1/16 sized image
+        glViewport(0, 0, WIDTH / downscale, HEIGHT / downscale);  // now the downscale is 4, 1/16 scaled image
         glDepthMask(GL_FALSE);
         skyShader.use();
         skyShader.setUniform1i("check", check % downscalesq);
@@ -348,8 +354,6 @@ int main()
         glBindVertexArray(VAO);
         glDrawArrays(GL_TRIANGLES, 0, 3);
         glBindVertexArray(0);
-
-
         
 
         // upscale the buffer into full size framebuffer
@@ -404,6 +408,15 @@ int main()
         glBindVertexArray(0);
         glDepthMask(GL_TRUE);
 
+        cloudRenderSum += (glfwGetTime() - cloudRenderStart) * 1000;
+        cloudRenderConter++;
+        if (cloudRenderConter % 60 == 0)
+        {
+            cloudRenderTime = cloudRenderSum / 60;
+            cloudRenderSum = 0;
+        }
+
+
 #pragma region Draw Bunny
         glCullFace(GL_BACK);
         blinnPhongShader.use();
@@ -427,6 +440,7 @@ int main()
         ground.Draw(&blinnPhongShader);
 #pragma endregion
 
+
         // Configure ImGUI 4/5
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
@@ -436,7 +450,14 @@ int main()
         // check camera movement
         glfwPollEvents();
         check++;
-    }
+
+        
+        //std::cout << timeStamp[0] << "  " << timeStamp[1] << "  " << timeStamp[2] << "  " << timeStamp[3] 
+        //    << "  " << timeStamp[4] << "  " << timeStamp[5] << "  " << timeStamp[6] << std::endl;
+        
+        
+        
+    }   
     
     // Configure ImGUI 5/5
     ImGui_ImplOpenGL3_Shutdown();
@@ -574,6 +595,9 @@ unsigned int loadTexture2D(const std::string& path, bool gamma)
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
+        float memory = width * height * 8 / 1024;
+        std::cout << "Succeed load 2D texture at : " << filePath << ", memory occupy : " << memory << " KB (add mipmap: " 
+            << memory * 4 / 3 << " KB)" << std::endl;
         stbi_image_free(data);
         glBindTexture(GL_TEXTURE_2D, 0);
     }
@@ -611,16 +635,20 @@ unsigned int loadTexture3D(const std::string& path, float width, float height, f
         glGenerateMipmap(GL_TEXTURE_3D);
 
         glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+        //glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);  // when clamp to border, all the cloud disappear (why?)
         glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_REPEAT);
         glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
         glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
+        float memory = width * height * depth * 8 / 1024;
+        std::cout << "Succeed load 3D texture at : " << filePath << ", memory occupy : " << memory << " KB (add mipmap: " 
+            << memory * 8 / 7 << " KB)" << std::endl;
         stbi_image_free(data);
         glBindTexture(GL_TEXTURE_3D, 0);
     }
     else
     {
-        std::cout << "Texture failed to load at path: " << filePath << std::endl;
+        std::cout << "Texture failed to load at : " << filePath << std::endl;
         stbi_image_free(data);
         glBindTexture(GL_TEXTURE_3D, 0);
     }

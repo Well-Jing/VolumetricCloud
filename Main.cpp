@@ -55,8 +55,8 @@ GLfloat startTime = 0.0f;
 #pragma region Window Attribution
 // Window dimensions
 const GLuint WIDTH = 1280, HEIGHT = 720;  // both the width and height should be multiple of 16
-//const GLuint WIDTH = 512 * 3.0, HEIGHT = 512 * 2.0; // if the window is not square, some antefacts show up
-const GLuint downscale = 4; //4 is best//any more and the gains dont make up for the lag
+//const GLuint WIDTH = 512 * 2.0, HEIGHT = 512 * 2.0; // if the window is not square, some antefacts show up
+const GLuint downscale = 2; //4 is best//any more and the gains dont make up for the lag
 GLuint downscalesq = downscale * downscale;
 GLfloat ASPECT = float(WIDTH) / float(HEIGHT);
 
@@ -115,7 +115,7 @@ int main()
     blinnPhongShader.setUniform3f("lightD.dirToLight", glm::vec3(lightD.direction.x, lightD.direction.y, lightD.direction.z));
 #pragma endregion
 
-#pragma region Triagnle Vertices
+#pragma region Triangle Vertices
     GLfloat vertices[] = {
        -1.0f, -1.0f,
        -1.0f,  3.0f,
@@ -192,13 +192,14 @@ int main()
     
 #pragma region Load Noise Texture
     //setup noise textures
-    GLuint curltex, worltex, perlworltex, weathertex;
+    GLuint curltex, worltex, perlworltex, weathertex, blueNoiseTex;
 
     //stbi_set_flip_vertically_on_load(true);
     curltex = loadTexture2D("assets/curlnoise.png");
     weathertex = loadTexture2D("assets/weather.bmp");
     worltex = loadTexture3D("assets/worlnoise.bmp", 32, 32, 32);
     perlworltex = loadTexture3D("assets/perlworlnoise.tga", 128, 128, 128);
+    blueNoiseTex = loadTexture2D("assets/blueNoise1024.png");
 #pragma endregion 
 
 #pragma region MVP Matrix Declaration
@@ -223,6 +224,8 @@ int main()
 
     
     camera.MovementSpeed = 20;
+    float cloudMovementSpeed = 1;
+
     float cloudRenderTime = 0;
     float cloudRenderStart;
     float cloudRenderSum = 0;
@@ -231,6 +234,8 @@ int main()
 
     glm::vec3 sunPos;
     float sunTime = 1.0;
+
+    float  blueNoiseRate = 15;
 
     int check = 0; // used for checkerboarding in the upscale shader
     while (!glfwWindowShouldClose(window))
@@ -248,39 +253,12 @@ int main()
             startTime = timePassed;
             frames = 0;
         }
-        
-        /*glm::mat4 newMat = glm::inverse(view) * (glm::inverse(projection) * projection) * view;
-        glm::mat4 newMat2 = glm::inverse(view) * glm::inverse(projection) * projection * view;
-        glm::mat4 newMatView = glm::inverse(view) * view;
-        glm::mat4 newMatProj = glm::inverse(projection) * projection;
-        glm::mat4 translate = glm::translate(glm::mat4(1.0f), glm::vec3(10000.0f, 11110.0f, 22222.0f));
-        translate[2][0] = 0.1f;
-        translate[1][0] = 0.2f;
-        translate[3][2] = 0.2f;
-        glm::mat4 invTranslate = glm::inverse(translate);
-
-        glm::mat4 resultMat = invTranslate * translate;
-
-        if (int(timePassed) - int(lastFrame))
-        {
-            std::cout.setf(std::ios::fixed);
-            std::cout << std::setprecision(5) << std::setw(8) << std::endl;
-
-            std::cout << "Translate Matrix: " << std::endl;
-            std::cout << std::setw(10) << translate[0][0] << " " << std::setw(10) << translate[0][1] << " " << std::setw(10) << translate[0][2] << " " << std::setw(10) << translate[0][3] << "   " << std::endl;
-            std::cout << std::setw(10) << translate[1][0] << " " << std::setw(10) << translate[1][1] << " " << std::setw(10) << translate[1][2] << " " << std::setw(10) << translate[1][3] << "   " << std::endl;
-            std::cout << std::setw(10) << translate[2][0] << " " << std::setw(10) << translate[2][1] << " " << std::setw(10) << translate[2][2] << " " << std::setw(10) << translate[2][3] << "   " << std::endl;
-            std::cout << std::setw(10) << translate[3][0] << " " << std::setw(10) << translate[3][1] << " " << std::setw(10) << translate[3][2] << " " << std::setw(10) << translate[3][3] << "   " << std::endl;
-
-            std::cout << "==================================================================" << std::endl;
-        }*/
-
         lastFrame = currentFrame;
         frames++;
 
-        LFMVPM = MVPM; // copy last MVP matrix for use in frame reprojection
 
         // update MVP matrix
+        LFMVPM = MVPM; // copy last MVP matrix for use in frame reprojection
         view = camera.getViewMatrix();
         projection = glm::perspective(glm::radians(camera.Zoom), (float)WIDTH / (float)HEIGHT, 0.1f, 1000.0f);
         MVPM = projection * view;
@@ -309,6 +287,8 @@ int main()
             //ImGui::SliderFloat("Light distance", &lightPosScaleRate, 0.3f, 1.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
             ImGui::SliderFloat("Camera speed", &(camera.MovementSpeed), 0.1f, 1000.0f);
             ImGui::SliderFloat("Sun time", &sunTime, 0.0f, 35.0f);
+            ImGui::SliderFloat("Blue noise rate", &blueNoiseRate, 0.0f, 50.0f);
+            ImGui::SliderFloat("Cloud movement speed", &cloudMovementSpeed, 0.0f, 1.0f);
             ImGui::ColorEdit3("clear color", (float*)&clear_color);
             ImGui::Text("Cloud render time %f ms/frame", cloudRenderTime);
             ImGui::Text("Position (%.1f, %.1f, %.1f)", camera.Position.x, camera.Position.y, camera.Position.z);
@@ -326,6 +306,8 @@ int main()
         skyShader.setUniform1f("time", timePassed);
         skyShader.setUniform1f("aspect", ASPECT);
         skyShader.setUniform1f("downscale", (float)downscale);
+        skyShader.setUniform1f("blueNoiseRate", blueNoiseRate);
+        skyShader.setUniform1f("cloudMovementSpeed", cloudMovementSpeed);
         skyShader.setUniform2f("resolution", glm::vec2((float)WIDTH, (float)HEIGHT));
         skyShader.setUniform3f("cameraPos", camera.Position);
         skyShader.setUniformMatrix("MVPM", MVPM);
@@ -342,6 +324,7 @@ int main()
         skyShader.setUniform1i("worl", 1);
         skyShader.setUniform1i("curl", 2);
         skyShader.setUniform1i("weather", 3);
+        skyShader.setUniform1i("blueNoise", 4);
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_3D, perlworltex);
         glActiveTexture(GL_TEXTURE1);
@@ -350,6 +333,8 @@ int main()
         glBindTexture(GL_TEXTURE_2D, curltex);
         glActiveTexture(GL_TEXTURE3);
         glBindTexture(GL_TEXTURE_2D, weathertex);
+        glActiveTexture(GL_TEXTURE4);
+        glBindTexture(GL_TEXTURE_2D, blueNoiseTex);
 
         glBindVertexArray(VAO);
         glDrawArrays(GL_TRIANGLES, 0, 3);
@@ -595,7 +580,7 @@ unsigned int loadTexture2D(const std::string& path, bool gamma)
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-        float memory = width * height * 8 / 1024;
+        float memory = width * height * nrComponents * 8 / 1024;
         std::cout << "Succeed load 2D texture at : " << filePath << ", memory occupy : " << memory << " KB (add mipmap: " 
             << memory * 4 / 3 << " KB)" << std::endl;
         stbi_image_free(data);
@@ -640,7 +625,7 @@ unsigned int loadTexture3D(const std::string& path, float width, float height, f
         glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
         glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-        float memory = width * height * depth * 8 / 1024;
+        float memory = width * height * depth * nrComponents * 8 / 1024;
         std::cout << "Succeed load 3D texture at : " << filePath << ", memory occupy : " << memory << " KB (add mipmap: " 
             << memory * 8 / 7 << " KB)" << std::endl;
         stbi_image_free(data);

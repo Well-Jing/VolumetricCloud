@@ -25,7 +25,7 @@ void main()
 
 	//vec2 uv = floor(gl_FragCoord.xy/downscale);  // these two lines can be written into one
 	//uv = uv/(resolution/downscale);             
-	vec2 uv = gl_FragCoord.xy/resolution;
+	vec2 uv = gl_FragCoord.xy / resolution;
 
 	vec4 col = vec4(0.0);
 	// if the pixel is not the pixel to update, reuse pixel from previous frame (pong)
@@ -51,7 +51,6 @@ void main()
 		if (lookup.x < 0.0 || lookup.x > 1.0 || lookup.y < 0.0 || lookup.y > 1.0) {
 			col = texture(buff, uv.xy); // buff is the current frame
 		} else {
-			//uv = gl_FragCoord.xy / resolution; // I think this line is not useful
 			col = texture(pong, lookup); // pong is previous frame
 			//col = texture(buff, uv.xy);
 		}

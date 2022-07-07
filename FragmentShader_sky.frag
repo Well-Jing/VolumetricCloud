@@ -11,6 +11,7 @@ uniform sampler3D perlworl;
 uniform sampler3D worl;
 uniform sampler2D curl;
 uniform sampler2D weather;
+uniform sampler2D blueNoise;
 
 uniform int check;
 uniform mat4 MVPM; 
@@ -19,6 +20,8 @@ uniform mat4 invView;
 uniform mat4 invProj;
 uniform float aspect;
 uniform float time;
+uniform float blueNoiseRate;
+uniform float cloudMovementSpeed;
 uniform vec2 resolution;
 uniform float downscale;
 uniform vec3 cameraPos;
@@ -41,7 +44,7 @@ const float sky_t_radius = 202300.0;//top of cloud layer
 const float c_radius = 6008400.0; //2d noise layer
 
 const float cwhiteScale = 1.1575370919881305;//precomputed 1/U2Tone(40)
-
+const float c_goldenRatioConjugate = 0.61803398875f;
 /*
 	 SHARED FUNCTIONS
 */
@@ -308,12 +311,13 @@ float remap(const float originalValue, const float originalMin, const float orig
 float density(vec3 p, vec3 weather,const bool hq,const float LOD) 
 {
 	float height_fraction = GetHeightFractionForPoint(length(p)); // the p should be used before times time, otherwise, the p will become much higher than the sky top, there is no cloud
-	p.z += time * 20.0;
+	p.z += time * 0;
 	vec4 n = textureLod(perlworl, p * 0.0003, LOD);  //textureLod and texture function are similar, I still do not understand the difference
 	float fbm = n.g*0.625 + n.b*0.25 + n.a*0.125;
-	float g = densityHeightGradient(height_fraction, 0.5);
+	//float g = densityHeightGradient(height_fraction, 0.5);  // why the cloud type is only one type ??? why do not use the weather map?
+	float g = densityHeightGradient(height_fraction, weather.b);
 	float base_cloud = remap(n.r, -(1.0 - fbm), 1.0, 0.0, 1.0);
-	float cloud_coverage = smoothstep(0.6, 1.3, weather.x);
+	float cloud_coverage = smoothstep(0.58, 1.3, weather.x);  // the choice of smoothstep is smart here, you can search smoothstep in wikipedia
 	base_cloud = remap(base_cloud*g, 1.0 - cloud_coverage, 1.0, 0.0, 1.0); 
 	base_cloud *= cloud_coverage;
 	if (hq) 
@@ -330,6 +334,8 @@ float density(vec3 p, vec3 weather,const bool hq,const float LOD)
 
 vec4 march(const vec3 pos, const vec3 end, vec3 dir, const int numSamples) 
 {
+	//vec3 shortDir = 0.2 * dir;
+	//vec3 longDir = 1 * dir;
 	float totalTrans = 1.0; // total tranparency
 	float alpha = 0.0;      // alpha channel value (why not reuse tranparency)
 	vec3 p = pos;           // sample position
@@ -337,13 +343,15 @@ vec4 march(const vec3 pos, const vec3 end, vec3 dir, const int numSamples)
 	const float t_dist = sky_t_radius - sky_b_radius; // sky thickness
 	float lss = t_dist / float(numSamples);  // secondary ray-marching step length?
 	vec3 ldir = vSunDirection * ss;          // direction towards sun? I think this is inverse, but when added -, the result looks strange
-	vec3 L = vec3(0.0); // Light Luminance?
+	vec3 L = vec3(0.0f); // Light Luminance?
+	vec3 L2 = vec3(0.0f);
 	int count = 0;
 	float t;
 	float costheta = dot(normalize(ldir), normalize(dir)); // the angle between view ray (first) and light ray (secondary)
 	float phase = max(max(HG(costheta, 0.6), HG(costheta, (0.99 - 1.3 * normalize(ldir).y))), HG(costheta, -0.3));  // phase function for volume rendering 
 	for (int i = 0; i < numSamples; i++) // sample points until the max number
 	{
+		if (totalTrans < 0.001) continue; // I do not know why, but if I use break or put it into for loop condition, artefact shows up
 		p += dir; // move forward
 		float height_fraction = GetHeightFractionForPoint(length(p)); // the height of cloud
 		const float weather_scale = 0.00008;
@@ -351,13 +359,15 @@ vec4 march(const vec3 pos, const vec3 end, vec3 dir, const int numSamples)
 		t = density(p, weather_sample, true, 0.0); // compute density
 		const float ldt = 0.5; // delta t, the minimum distance for differential (!!! this value can be manipulated)
 		float dt = exp(-ldt * t * ss); 
-		totalTrans *= dt;		
+		totalTrans *= dt;	
+		
 		vec3 lp = p;
 		float lt;
 		const float ld = 0.5;
 		float ncd = 0.0;  // the two cd should be about cone (neighbor cone density, cone density)
 		float cd = 0.0;
-		if (t > 0.0) //calculate lighting, but only when we are in a non-zero density point (when there is cloud)
+		
+		if (t > 0.0)  //calculate lighting, but only when we are in a non-zero density point (when there is cloud)
 		{ 
 			for (int j = 0; j < 6; j++) 
 			{
@@ -373,7 +383,7 @@ vec4 march(const vec3 pos, const vec3 end, vec3 dir, const int numSamples)
 			cd += lt;
 			ncd += (lt * (1.0 - (cd * (1.0 / (lss * 18.0)))));
 
-			float beers = max(exp(-ld * ncd * lss), exp(-ld * 0.25 * ncd * lss)*0.7);  // Beer's-Powder function
+			float beers = max(exp(-ld * ncd * lss), exp(-ld * 0.25 * ncd * lss) * 0.7);  // Beer's-Powder function
 			float powder = 1.0 - exp(-ld * ncd * lss * 2.0);  
 
 			vec3 ambient = 5.0 * vAmbient * mix(0.15, 1.0, height_fraction);
@@ -382,6 +392,11 @@ vec4 march(const vec3 pos, const vec3 end, vec3 dir, const int numSamples)
 			                                                                            // (did you counter the out-scattering rate?)
 																						// (should we multiple totalTrans again?)
 			alpha += (1.0 - dt) * (1.0 - alpha);
+			//dir = shortDir;
+		}
+		else
+		{
+			//dir = longDir;
 		}
 	}
 	return vec4(L, alpha);
@@ -409,21 +424,31 @@ void main()
 		vec3 end = camPos + dir * intersectSphere(camPos, dir, sky_t_radius);   // the intersection with the top of the cloud layer
 		const float t_dist = sky_t_radius - sky_b_radius;                       // the thickness of the cloud layer
 		float shelldist = (length(end - start));                                // the exact thickness (the ray with the cloud layer, the larger angle, the thicker layer)
-		float steps = (mix(96.0, 54.0, dot(dir, vec3(0.0, 1.0, 0.0))));         // the larger angle, the thicker cloud layer, the more samples
+		//float steps = (mix(96.0, 54.0, dot(dir, vec3(0.0, 1.0, 0.0))));         // the larger angle, the thicker cloud layer, the more samples
+		float steps = (mix(200.0, 82.0, dot(dir, vec3(0.0, 1.0, 0.0))));         // the larger angle, the thicker cloud layer, the more samples
 		float dmod = smoothstep(0.0, 1.0, (shelldist / t_dist) / 14.0);         // these two lines are manipulating the length of every step (the parameter here, 14.0 and 4.0 are decided by the user) 
 		float s_dist = mix(t_dist, t_dist*4.0, dmod) / (steps); 
 		vec3 raystep = dir * s_dist;                                            // the length and direction of every step
-		vec4 volume = march(start, end, raystep, int(steps));                   // ray-marching
+		float blueNoise = texture(blueNoise, gl_FragCoord.xy / 1024.0f).r;
+		vec3 blueNoiseOffset = fract(blueNoise + float(time) * c_goldenRatioConjugate) * dir * blueNoiseRate;  // use blue noise
+		
+		//vec3 lweather = texture(weather, vec2(0.1f, 0.1f)).xyz;
+		vec4 volume = march(start + blueNoiseOffset, end, raystep, int(steps)); // ray-marching
 		volume.xyz = U2Tone(volume.xyz)*cwhiteScale;                            // HDR Tone mapping
 		volume.xyz = sqrt(volume.xyz);
 		vec3 background = vec3(0.0);
-		if (volume.a < 0.99) 
-		{
-			background = preetham(dir);
-			background = max(background, stars(dir));
-		}
+		background = preetham(dir);
+		background = max(background, stars(dir));
+//		if (volume.a <= 0.9) 
+//		{
+//			background = preetham(dir);
+//			background = max(background, stars(dir));
+//		}
 
 		col = vec4(background * (1.0 - volume.a) + volume.xyz * volume.a, 1.0);
+
+		//if (volume.a <= 0.2 && volume.a > 0) col = vec4(1.0, 0.0, 0.0, 1.0);
+		//col = vec4( volume.xyz * volume.a, 1.0);
 		if (volume.a > 1.0) 
 		{
 			col = vec4(1.0, 0.0, 0.0, 1.0); // when it is totally opaque??

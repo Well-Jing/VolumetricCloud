@@ -224,7 +224,7 @@ int main()
 
     
     camera.MovementSpeed = 20;
-    float cloudMovementSpeed = 1;
+    float debugValue = 1;
 
     float cloudRenderTime = 0;
     float cloudRenderStart;
@@ -235,7 +235,9 @@ int main()
     glm::vec3 sunPos;
     float sunTime = 1.0;
 
-    float  blueNoiseRate = 15;
+    float blueNoiseRate = 15;
+    float lowSampleNum = 64;
+    float highSampleNum = 128;
 
     int check = 0; // used for checkerboarding in the upscale shader
     while (!glfwWindowShouldClose(window))
@@ -288,7 +290,9 @@ int main()
             ImGui::SliderFloat("Camera speed", &(camera.MovementSpeed), 0.1f, 1000.0f);
             ImGui::SliderFloat("Sun time", &sunTime, 0.0f, 35.0f);
             ImGui::SliderFloat("Blue noise rate", &blueNoiseRate, 0.0f, 50.0f);
-            ImGui::SliderFloat("Cloud movement speed", &cloudMovementSpeed, 0.0f, 1.0f);
+            ImGui::SliderFloat("Low sample number", &lowSampleNum, 0.0f, 3 * 512.0f);
+            ImGui::SliderFloat("High sample number", &highSampleNum, 0.0f, 3 * 1024.0f);
+            ImGui::SliderFloat("Debug value", &debugValue, 1.0f, 5.0f);
             ImGui::ColorEdit3("clear color", (float*)&clear_color);
             ImGui::Text("Cloud render time %f ms/frame", cloudRenderTime);
             ImGui::Text("Position (%.1f, %.1f, %.1f)", camera.Position.x, camera.Position.y, camera.Position.z);
@@ -307,7 +311,9 @@ int main()
         skyShader.setUniform1f("aspect", ASPECT);
         skyShader.setUniform1f("downscale", (float)downscale);
         skyShader.setUniform1f("blueNoiseRate", blueNoiseRate);
-        skyShader.setUniform1f("cloudMovementSpeed", cloudMovementSpeed);
+        skyShader.setUniform1f("debugValue", debugValue);
+        skyShader.setUniform1f("lowSampleNum", lowSampleNum);
+        skyShader.setUniform1f("highSampleNum", highSampleNum);
         skyShader.setUniform2f("resolution", glm::vec2((float)WIDTH, (float)HEIGHT));
         skyShader.setUniform3f("cameraPos", camera.Position);
         skyShader.setUniformMatrix("MVPM", MVPM);
@@ -411,7 +417,7 @@ int main()
         blinnPhongShader.setUniformMatrix("viewMat", view);
         blinnPhongShader.setUniformMatrix("projMat", projection);
 
-        bunny.Draw(&blinnPhongShader);
+        //bunny.Draw(&blinnPhongShader);
 #pragma endregion
 
 #pragma region Draw Ground
@@ -422,7 +428,7 @@ int main()
         blinnPhongShader.setUniformMatrix("viewMat", view);
         blinnPhongShader.setUniformMatrix("projMat", projection);
 
-        ground.Draw(&blinnPhongShader);
+        //ground.Draw(&blinnPhongShader);
 #pragma endregion
 
 

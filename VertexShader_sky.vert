@@ -34,7 +34,7 @@ const float hM = 1200.0; // Mie
 const float earth_radius = 6360e3; // (m)
 const float atmosphere_radius = 6420e3; // (m)
 
-const float sun_power = 30.0;
+const float sun_power = 20.0;
 
 //These numbers can be lowered to acheive faster speed, but they are good enough here
 const int num_samples = 16;

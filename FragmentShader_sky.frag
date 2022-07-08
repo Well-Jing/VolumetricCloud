@@ -21,7 +21,9 @@ uniform mat4 invProj;
 uniform float aspect;
 uniform float time;
 uniform float blueNoiseRate;
-uniform float cloudMovementSpeed;
+uniform float debugValue;
+uniform float lowSampleNum;
+uniform float highSampleNum;
 uniform vec2 resolution;
 uniform float downscale;
 uniform vec3 cameraPos;
@@ -50,7 +52,8 @@ const float c_goldenRatioConjugate = 0.61803398875f;
 */
 
 // HDR tone mapping function
-vec3 U2Tone(const vec3 x) {
+vec3 U2Tone(const vec3 x) 
+{
 	const float A = 0.15;
 	const float B = 0.50;
 	const float C = 0.10;
@@ -62,9 +65,10 @@ vec3 U2Tone(const vec3 x) {
 }
 
 
-float HG(float costheta, float g) {
+float HG(float costheta, float g) 
+{
 	const float k = 0.0795774715459; 
-	return k*(1.0-g*g)/(pow(1.0+g*g-2.0*g*costheta, 1.5));
+	return k * (1.0 - g * g) / pow(1.0 + g * g - 2.0 * g * costheta, 1.5);
 }
 
 
@@ -160,7 +164,8 @@ float SimplexPolkaDot3D( 	vec3 P, float density )	//	the maximal dimness of a do
     return dot(b, point_distance);
 }
 
-vec3 stars(vec3 ndir) {
+vec3 stars(vec3 ndir) 
+{
 
 	vec3 COLOR = vec3(0.0);
 	float star = SimplexPolkaDot3D(ndir*100.0, 0.15)+SimplexPolkaDot3D(ndir*150.0, 0.25)*0.7;
@@ -214,7 +219,8 @@ const float THREE_OVER_SIXTEENPI = 0.05968310365946075;
 
 const float whiteScale = 1.0748724675633854; // 1.0 / Uncharted2Tonemap(1000.0)
 
-vec3 preetham(const vec3 vWorldPosition) {
+vec3 preetham(const vec3 vWorldPosition) 
+{
 // optical length
 // cutoff angle at 90 to avoid singularity in next formula.
 	float zenithAngle = acos( max( 0.0, dot( up, normalize( vWorldPosition ) ) ) );
@@ -291,15 +297,47 @@ float densityHeightGradient(const float heightFrac, const float cloudType)
 	return smoothstep(cloudGradient.x, cloudGradient.y, heightFrac) - smoothstep(cloudGradient.z, cloudGradient.w, heightFrac);
 }
 
+// very simple geometry and trigonometry \
+// (https://www.scratchapixel.com/lessons/3d-basic-rendering/minimal-ray-tracer-rendering-simple-shapes/ray-sphere-intersection)
 float intersectSphere(const vec3 pos, const vec3 dir, const float r) 
 {
     float a = dot(dir, dir);
     float b = 2.0 * dot(dir, pos);
     float c = dot(pos, pos) - (r * r);
-		float d = sqrt((b*b) - 4.0*a*c);
-		float p = -b - d;
-		float p2 = -b + d;
-    return max(p, p2)/(2.0*a);
+	float d = sqrt((b * b) - 4.0 * a * c);
+	float p = -b - d;
+	float p2 = -b + d;
+    return max(0, max(p, p2) / (2.0 * a));
+}
+
+vec2 intersectSphereMix(const vec3 pos, const vec3 dir, const float r0, const float r1) 
+{
+    float a = dot(dir, dir);
+    float b = 2.0 * dot(dir, pos);
+    float c = dot(pos, pos) - (r0* r0);
+	float d = sqrt((b * b) - 4.0 * a * c);
+	float p0_0 = -b - d;
+	float p0_1 = -b + d;
+    
+    c = dot(pos, pos) - (r1* r1);
+	d = sqrt((b * b) - 4.0 * a * c);
+	float p1_0 = -b - d;
+	float p1_1 = -b + d;
+
+	if (pos.y < r0)
+	{
+		return vec2(max(p0_0, p0_1) / (2.0 * a), max(p1_0, p1_1) / (2.0 * a));
+	}
+	else if (pos.y >= r0 && pos.y <= r1)
+	{
+		return vec2(0, dir.y >= 0? max(p1_0, p1_1) / (2.0 * a) : min(p0_0, p0_1) / (2.0 * a));
+	}
+	else 
+	{
+		if (dir.y >= 0) return vec2(0, 0);
+		else return vec2(min(p1_0, p1_1) / (2.0 * a), min(p0_0, p0_1) / (2.0 * a));
+		//else return vec2(0, min(p0_0, p0_1) / (2.0 * a));
+	}
 }
 
 // Utility function that maps a value from one range to another. 
@@ -349,6 +387,7 @@ vec4 march(const vec3 pos, const vec3 end, vec3 dir, const int numSamples)
 	float t;
 	float costheta = dot(normalize(ldir), normalize(dir)); // the angle between view ray (first) and light ray (secondary)
 	float phase = max(max(HG(costheta, 0.6), HG(costheta, (0.99 - 1.3 * normalize(ldir).y))), HG(costheta, -0.3));  // phase function for volume rendering 
+	//float phase = HG(costheta, 0.1);
 	for (int i = 0; i < numSamples; i++) // sample points until the max number
 	{
 		if (totalTrans < 0.001) continue; // I do not know why, but if I use break or put it into for loop condition, artefact shows up
@@ -416,21 +455,30 @@ void main()
 	                                                                // it works without divided by w
 																			
 	vec4 col = vec4(0.0);
+	vec3 camPos = vec3(0.0, g_radius, 0.0) + cameraPos;                     // camPos is for computing cloud, while cameraPos is the exact position of the game camera
 	// if it is higher than horizon
-	if (dir.y > 0.0) 
+	//if (dir.y > 0.0) 
+	//if(1 > 0)
+	if (dir.y > 0.0 || (camPos.y >= sky_b_radius))
 	{ 
-		vec3 camPos = vec3(0.0, g_radius, 0.0) + cameraPos;                     // camPos is for computing cloud, while cameraPos is the exact position of the game camera
-		vec3 start = camPos + dir * intersectSphere(camPos, dir, sky_b_radius); // the intersection with the bottom of the cloud layer
-		vec3 end = camPos + dir * intersectSphere(camPos, dir, sky_t_radius);   // the intersection with the top of the cloud layer
+		//vec3 start = camPos + dir * intersectSphere(camPos, dir, sky_b_radius); // the intersection with the bottom of the cloud layer
+		//vec3 end = camPos + dir * intersectSphere(camPos, dir, sky_t_radius);   // the intersection with the top of the cloud layer
+		
+		vec2 cloudLayerInterscetion = intersectSphereMix(camPos, dir, sky_b_radius, sky_t_radius);
+		vec3 start = camPos + dir * cloudLayerInterscetion.x;
+		vec3 end = camPos + dir * cloudLayerInterscetion.y;
 		const float t_dist = sky_t_radius - sky_b_radius;                       // the thickness of the cloud layer
-		float shelldist = (length(end - start));                                // the exact thickness (the ray with the cloud layer, the larger angle, the thicker layer)
-		//float steps = (mix(96.0, 54.0, dot(dir, vec3(0.0, 1.0, 0.0))));         // the larger angle, the thicker cloud layer, the more samples
-		float steps = (mix(200.0, 82.0, dot(dir, vec3(0.0, 1.0, 0.0))));         // the larger angle, the thicker cloud layer, the more samples
+		float shelldist = min((length(end - start)), t_dist * 3);               // the exact thickness (the ray with the cloud layer, the larger angle, the thicker layer), set a max length
+		//float steps = (mix(96.0, 54.0, dot(dir, vec3(0.0, 1.0, 0.0))));       // the larger angle, the thicker cloud layer, the more samples
+		//float steps = (mix(128.0, 64.0, abs(dot(dir, vec3(0.0, 1.0, 0.0)))));        // the larger angle, the thicker cloud layer, the more samples
+		float steps = (mix(highSampleNum, lowSampleNum, abs(dot(dir, vec3(0.0, 1.0, 0.0)))));        // the larger angle, the thicker cloud layer, the more samples
 		float dmod = smoothstep(0.0, 1.0, (shelldist / t_dist) / 14.0);         // these two lines are manipulating the length of every step (the parameter here, 14.0 and 4.0 are decided by the user) 
-		float s_dist = mix(t_dist, t_dist*4.0, dmod) / (steps); 
-		vec3 raystep = dir * s_dist;                                            // the length and direction of every step
+		//float s_dist = mix(t_dist, t_dist*4.0, dmod) / (steps);
+		//float s_dist = mix(shelldist, shelldist*2.0, dmod) / (steps);
+		float s_dist = shelldist / (steps);
+		vec3 raystep = dir * s_dist * debugValue;                                            // the length and direction of every step
 		float blueNoise = texture(blueNoise, gl_FragCoord.xy / 1024.0f).r;
-		vec3 blueNoiseOffset = fract(blueNoise + float(time) * c_goldenRatioConjugate) * dir * blueNoiseRate;  // use blue noise
+		vec3 blueNoiseOffset = fract(blueNoise + float(time * 100) * c_goldenRatioConjugate) * dir * blueNoiseRate;  // use blue noise
 		
 		//vec3 lweather = texture(weather, vec2(0.1f, 0.1f)).xyz;
 		vec4 volume = march(start + blueNoiseOffset, end, raystep, int(steps)); // ray-marching
@@ -438,17 +486,8 @@ void main()
 		volume.xyz = sqrt(volume.xyz);
 		vec3 background = vec3(0.0);
 		background = preetham(dir);
-		background = max(background, stars(dir));
-//		if (volume.a <= 0.9) 
-//		{
-//			background = preetham(dir);
-//			background = max(background, stars(dir));
-//		}
-
 		col = vec4(background * (1.0 - volume.a) + volume.xyz * volume.a, 1.0);
 
-		//if (volume.a <= 0.2 && volume.a > 0) col = vec4(1.0, 0.0, 0.0, 1.0);
-		//col = vec4( volume.xyz * volume.a, 1.0);
 		if (volume.a > 1.0) 
 		{
 			col = vec4(1.0, 0.0, 0.0, 1.0); // when it is totally opaque??
@@ -457,7 +496,9 @@ void main()
 	// if it is lower than horizon, all grey
 	else 
 	{
-		col = vec4(vec3(0.4), 1.0);
+		vec3 background = vec3(0.0);
+		background = preetham(dir);
+		col = vec4(background, 1.0);
 	}
 	color = col;
 }

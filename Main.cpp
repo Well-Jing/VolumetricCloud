@@ -30,6 +30,11 @@ void mouseCallback(GLFWwindow* window, double xpos, double ypos);
 unsigned int loadTexture2D(const std::string& path, bool gamma = true);
 unsigned int loadTexture3D(const std::string& path, float width, float height, float depth, bool gamma = true);
 glm::vec3 getSunPosition(float time);
+
+void framebuffer_size_callback(GLFWwindow* window, int width, int height)
+{
+    glViewport(0, 0, width, height);
+}
 #pragma endregion
 
 #pragma region Camera Creation and Attribution
@@ -60,6 +65,10 @@ const GLuint downscale = 2; //4 is best//any more and the gains dont make up for
 GLuint downscalesq = downscale * downscale;
 GLfloat ASPECT = float(WIDTH) / float(HEIGHT);
 
+#pragma endregion
+
+#pragma region Shadow Map Attribution
+const GLuint ESMWIDTH = 512, ESMHEIGHT = 512;
 #pragma endregion
 
 // The MAIN function, from here we start the application and run the game loop
@@ -94,6 +103,7 @@ int main()
 
     //not sure this is necessary?
     glViewport(0, 0, WIDTH, HEIGHT);
+    glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 #pragma endregion
     
 #pragma region Create Shader
@@ -187,6 +197,20 @@ int main()
     glBindFramebuffer(GL_FRAMEBUFFER, subbuffer);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, subbuffertex, 0);
 
+
+    GLuint ESMfbo, ESMfbotex;
+
+    glGenFramebuffers(1, &ESMfbo);
+    glGenTextures(1, &ESMfbotex);
+    glBindTexture(GL_TEXTURE_2D, ESMfbotex);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, ESMWIDTH, ESMHEIGHT, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+    glBindFramebuffer(GL_FRAMEBUFFER, ESMfbo);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, ESMfbotex, 0);
+
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 #pragma endregion
     
@@ -197,8 +221,10 @@ int main()
     //stbi_set_flip_vertically_on_load(true);
     curltex = loadTexture2D("assets/curlnoise.png");
     weathertex = loadTexture2D("assets/weather.bmp");
-    worltex = loadTexture3D("assets/worlnoise.bmp", 32, 32, 32);
+    //worltex = loadTexture3D("assets/worlnoise.bmp", 32, 32, 32);
     perlworltex = loadTexture3D("assets/perlworlnoise.tga", 128, 128, 128);
+    worltex = loadTexture3D("assets/noiseErosion.tga", 32, 32, 32);
+    //perlworltex = loadTexture3D("assets/noiseShape.tga", 128, 128, 128);
     blueNoiseTex = loadTexture2D("assets/blueNoise1024.png");
 #pragma endregion 
 
@@ -210,6 +236,9 @@ int main()
     glm::mat4 projection;
     projection = glm::perspective(glm::radians(camera.Zoom), (float)WIDTH / (float)HEIGHT, 0.1f, 1000.0f);
     MVPM = projection * view;
+
+    glm::mat2 sunView;
+    glm::mat4 sunProjection = glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, 0.0f, 10.0f);
 #pragma endregion
 
 #pragma region Configure ImGUI
@@ -235,9 +264,9 @@ int main()
     glm::vec3 sunPos;
     float sunTime = 1.0;
 
-    float blueNoiseRate = 15;
-    float lowSampleNum = 64;
-    float highSampleNum = 128;
+    float blueNoiseRate = 14;
+    float lowSampleNum = 70;
+    float highSampleNum = 150;
 
     int check = 0; // used for checkerboarding in the upscale shader
     while (!glfwWindowShouldClose(window))
@@ -260,11 +289,15 @@ int main()
 
 
         // update MVP matrix
+        //sunPos = getSunPosition(timePassed);
+        sunPos = getSunPosition(sunTime);
         LFMVPM = MVPM; // copy last MVP matrix for use in frame reprojection
         view = camera.getViewMatrix();
         projection = glm::perspective(glm::radians(camera.Zoom), (float)WIDTH / (float)HEIGHT, 0.1f, 1000.0f);
         MVPM = projection * view;
-        //invMVPM = glm::inverse(view) * glm::inverse(projection);   
+        sunView = glm::lookAt(camera.Position + 10000.0f * -sunPos, 
+            camera.Position + float(10000.0 - 1.0) * -sunPos,
+            glm::vec3(0.0f, 1.0f, 0.0f));
         
         // check for errors TODO wrap in a define DEBUG
         /*GLenum err;
@@ -292,7 +325,7 @@ int main()
             ImGui::SliderFloat("Blue noise rate", &blueNoiseRate, 0.0f, 50.0f);
             ImGui::SliderFloat("Low sample number", &lowSampleNum, 0.0f, 3 * 512.0f);
             ImGui::SliderFloat("High sample number", &highSampleNum, 0.0f, 3 * 1024.0f);
-            ImGui::SliderFloat("Debug value", &debugValue, 1.0f, 5.0f);
+            ImGui::SliderFloat("Debug value", &debugValue, 0.0f, 1000.0f);
             ImGui::ColorEdit3("clear color", (float*)&clear_color);
             ImGui::Text("Cloud render time %f ms/frame", cloudRenderTime);
             ImGui::Text("Position (%.1f, %.1f, %.1f)", camera.Position.x, camera.Position.y, camera.Position.z);
@@ -316,14 +349,11 @@ int main()
         skyShader.setUniform1f("highSampleNum", highSampleNum);
         skyShader.setUniform2f("resolution", glm::vec2((float)WIDTH, (float)HEIGHT));
         skyShader.setUniform3f("cameraPos", camera.Position);
+        skyShader.setUniform3f("sunDirection", sunPos);
         skyShader.setUniformMatrix("MVPM", MVPM);
         skyShader.setUniformMatrix("invMVPM", invMVPM);
         skyShader.setUniformMatrix("invView", glm::inverse(view));
         skyShader.setUniformMatrix("invProj", glm::inverse(projection));
-
-        //sunPos = getSunPosition(timePassed);
-        sunPos = getSunPosition(sunTime);
-        skyShader.setUniform3f("sunDirection", sunPos);
 
         // set textures (weather + noise)
         skyShader.setUniform1i("perlworl", 0);
@@ -386,7 +416,7 @@ int main()
         glDrawArrays(GL_TRIANGLES, 0, 3);
         glBindVertexArray(0);
 
-
+        
         // copy to the main screen (display)
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         postShader.use();
@@ -626,7 +656,7 @@ unsigned int loadTexture3D(const std::string& path, float width, float height, f
         glGenerateMipmap(GL_TEXTURE_3D);
 
         glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-        //glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);  // when clamp to border, all the cloud disappear (why?)
+        //glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);  // when clamp to border, all the cloud disappear (why?)
         glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_REPEAT);
         glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
         glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);

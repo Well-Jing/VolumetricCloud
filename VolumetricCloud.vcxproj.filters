@@ -73,6 +73,7 @@
     <None Include="VertexShader_upscale.vert" />
     <None Include="FragmentShader_blinnPhong.frag" />
     <None Include="VertexShader_blinnPhong.vert" />
+    <None Include="FragmentShader_ESM.frag" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Camera.h">
@@ -123,5 +124,8 @@
     <ClInclude Include="Model.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="VertexShader_ESM.vert" />
   </ItemGroup>
 </Project>

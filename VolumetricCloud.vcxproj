@@ -168,6 +168,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="FragmentShader_blinnPhong.frag" />
+    <None Include="FragmentShader_ESM.frag" />
     <None Include="FragmentShader_sky.frag" />
     <None Include="VertexShader_sky.vert" />
     <None Include="FragmentShader_postprocess.frag" />
@@ -193,6 +194,9 @@
     <ClInclude Include="Model.h" />
     <ClInclude Include="Shader.h" />
     <ClInclude Include="stb_image.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="VertexShader_ESM.vert" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

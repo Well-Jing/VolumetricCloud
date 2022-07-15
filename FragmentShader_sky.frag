@@ -12,8 +12,10 @@ uniform sampler3D worl;
 uniform sampler2D curl;
 uniform sampler2D weather;
 uniform sampler2D blueNoise;
+uniform sampler2D ESM;
 
 uniform int check;
+uniform mat4 sunView; 
 uniform mat4 MVPM; 
 uniform mat4 invMVPM;
 uniform mat4 invView;
@@ -42,7 +44,8 @@ out vec4 color;
 //I like the look of the small sky, but could be tweaked however
 const float g_radius = 200000.0; //ground radius
 const float sky_b_radius = 201000.0;//bottom of cloud layer
-const float sky_t_radius = 203000.0;//top of cloud layer 202300.0
+const float sky_t_radius = 204000.0;//top of cloud layer 202300.0
+//float sky_t_radius = 204000.0 + debugValue;//top of cloud layer 202300.0
 const float c_radius = 6008400.0; //2d noise layer
 
 const float cwhiteScale = 1.1575370919881305;//precomputed 1/U2Tone(40)
@@ -359,6 +362,7 @@ float density(vec3 p, vec3 weather, const bool hq, const float LOD)
 	float cloud_coverage = smoothstep(0.6, 1.3, weather.x);  // the choice of smoothstep is smart here, you can search smoothstep in wikipedia
 	base_cloud = remap(base_cloud*gradient, 1.0 - cloud_coverage, 1.0, 0.0, 1.0); 
 	base_cloud *= cloud_coverage;
+	
 	if (hq) 
 	{
 		//vec2 whisp = texture(curl, p.xy * 0.0003).xy;
@@ -385,14 +389,12 @@ vec4 march(const vec3 pos, const vec3 end, vec3 dir, const int numSamples)
 	const float densityScale = 0.2; // scale the attenuation of cloud
 	float costheta = dot(normalize(secondRayDir), normalize(dir)); // the angle between view ray (first) and light ray (secondary)
 	float phase = max(HG(costheta, 0.6), 1.4 * HG(costheta, 0.99 - 0.4)); // this is from Nubis 2017 siggraph course
-	phase = mix(phase, HG(costheta, -0.5), 0.3);
-	//float phase = HG(costheta, debugValue);
-
+	phase = mix(phase, HG(costheta, -0.5), 0.3); // when look along the sun light direction (from Frostbite 2016 talk)
+	const float weatherScale = 0.00005; // original 0.00008 // 0.00005 is beautiful!!!
 	for (int i = 0; i < numSamples; i++) // sample points until the max number
 	{
-		if (totalTrans < 0.001) continue; // I do not know why, but if I use break or put it into for loop condition, artefact shows up
+		if (totalTrans < 0.001) break; // I do not know why, but if I use break or put it into for loop condition, artefact shows up
 		p += dir; // move forward
-		const float weatherScale = 0.0001; // original 0.00008
 		vec3 weatherSample = texture(weather, p.xz * weatherScale).xyz; // get weather information
 		float viewRayDensity = density(p, weatherSample, true, 0.0); // compute density
 		float transmitance = exp(-densityScale * viewRayDensity * stepDistance); 
@@ -404,11 +406,10 @@ vec4 march(const vec3 pos, const vec3 end, vec3 dir, const int numSamples)
 			vec3 secondRayPos = p;
 			float secondRayDensity;
 			float densitySum = 0.0;
-			secondRayDir = 80 * normalize(secondRayDir);
+			secondRayDir = 200 * normalize(secondRayDir);
 			for (int j = 0; j < 10; j++) 
 			{
 				secondRayPos += secondRayDir;
-				//secondRayPos += debugValue * normalize(secondRayDir);
 				vec3 secondRayWeather = texture(weather, secondRayPos.xz * weatherScale).xyz;
 				//densitySum += density(secondRayPos, secondRayWeather, false, float(j));
 				densitySum += density(secondRayPos, secondRayWeather, false, float(j));
@@ -420,7 +421,6 @@ vec4 march(const vec3 pos, const vec3 end, vec3 dir, const int numSamples)
 							  exp(-densityScale * densitySum * length(secondRayDir) * 0.25 ) * 0.7);  // this is from Nubis 2017 siggraph course
 			//float powder = 1.0 - exp(-densityScale * densitySum * secondRayDistance * 2.0);
 			//float beersPowder = 2 * beers * powder; // here times 2.0 to approximate a good effect (check GPU Pro 360 Guide to lighting)
-			//float beersPowder = mix(beers, 2 * beers * powder, debugValue) ;
 			float beersPowder = beers;
 			vec3 sunC = pow(vSunColor, vec3(0.75)); // sun color
 			L += (ambient + sunC * beersPowder * phase) * viewRayDensity * totalTrans * stepDistance;		// (did you counter the out-scattering rate?)
@@ -437,8 +437,8 @@ void main()
 {
 	vec2 shift = vec2(floor(float(check) / downscale), mod(float(check), downscale));	
 	vec2 uv = (gl_FragCoord.xy * downscale + shift.yx) / (resolution); // !: shift.yx, not .xy (why do not change the order in the previous) 
-	uv = uv-vec2(0.5);
-	uv *= 2.0;
+	uv = uv-vec2(0.5); // remapping to NDC
+	uv *= 2.0; // remapping to NDC
 	//uv.x *= aspect;  // after multiply aspect (may > 1), the uv may over -1 and 1 (exceed clip space), this may cause problems when calculating world space position
 	vec4 uvdir = vec4(uv.xy, 1.0, 1.0);          // the z value can be from -1 to 1 (it seems all values are fine) 
 	vec4 worldPos = invView * (invProj * uvdir); // the matrix shoule be seperated, if pass a whole MVP or inv MVP martrix, the precision problems will occur 
@@ -480,7 +480,7 @@ void main()
 		vec3 background = vec3(1.0);
 		background = preetham(dir);
 		col = vec4(background * (1.0 - volume.a) + volume.xyz * volume.a, 1.0);
-
+		//col = vec4(vec3(pow(background.x * (1.0 - volume.a) + volume.x * volume.a, 15)), 1.0);
 		if (volume.a > 1.0) 
 		{
 			col = vec4(1.0, 0.0, 0.0, 1.0); // output error area

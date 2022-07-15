@@ -31,10 +31,6 @@ unsigned int loadTexture2D(const std::string& path, bool gamma = true);
 unsigned int loadTexture3D(const std::string& path, float width, float height, float depth, bool gamma = true);
 glm::vec3 getSunPosition(float time);
 
-void framebuffer_size_callback(GLFWwindow* window, int width, int height)
-{
-    glViewport(0, 0, width, height);
-}
 #pragma endregion
 
 #pragma region Camera Creation and Attribution
@@ -68,7 +64,7 @@ GLfloat ASPECT = float(WIDTH) / float(HEIGHT);
 #pragma endregion
 
 #pragma region Shadow Map Attribution
-const GLuint ESMWIDTH = 512, ESMHEIGHT = 512;
+const GLuint ESM_WIDTH = 512, ESM_HEIGHT = 512;
 #pragma endregion
 
 // The MAIN function, from here we start the application and run the game loop
@@ -103,7 +99,6 @@ int main()
 
     //not sure this is necessary?
     glViewport(0, 0, WIDTH, HEIGHT);
-    glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 #pragma endregion
     
 #pragma region Create Shader
@@ -112,6 +107,7 @@ int main()
     Shader upscaleShader("VertexShader_upscale.vert", "FragmentShader_upscale.frag");
     Shader postShader("VertexShader_postprocess.vert", "FragmentShader_postprocess.frag");
     Shader blinnPhongShader("VertexShader_blinnPhong.vert", "FragmentShader_blinnPhong.frag");
+    Shader ESMShader("VertexShader_ESM.vert", "FragmentShader_ESM.frag");
 #pragma endregion
 
 #pragma region Light Declaration
@@ -197,13 +193,13 @@ int main()
     glBindFramebuffer(GL_FRAMEBUFFER, subbuffer);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, subbuffertex, 0);
 
-
+    // shadow map fbo
     GLuint ESMfbo, ESMfbotex;
 
     glGenFramebuffers(1, &ESMfbo);
     glGenTextures(1, &ESMfbotex);
     glBindTexture(GL_TEXTURE_2D, ESMfbotex);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, ESMWIDTH, ESMHEIGHT, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, ESM_WIDTH, ESM_HEIGHT, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glBindTexture(GL_TEXTURE_2D, 0);
@@ -237,8 +233,8 @@ int main()
     projection = glm::perspective(glm::radians(camera.Zoom), (float)WIDTH / (float)HEIGHT, 0.1f, 1000.0f);
     MVPM = projection * view;
 
-    glm::mat2 sunView;
-    glm::mat4 sunProjection = glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, 0.0f, 10.0f);
+    glm::mat4 sunView;
+    glm::mat4 sunProjection = glm::ortho(-5000.0f, 5000.0f, -5000.0f, 5000.0f, 0.0f, 10.0f);
 #pragma endregion
 
 #pragma region Configure ImGUI
@@ -290,15 +286,15 @@ int main()
 
         // update MVP matrix
         //sunPos = getSunPosition(timePassed);
-        sunPos = getSunPosition(sunTime);
+        sunPos = glm::normalize(getSunPosition(sunTime));
         LFMVPM = MVPM; // copy last MVP matrix for use in frame reprojection
         view = camera.getViewMatrix();
         projection = glm::perspective(glm::radians(camera.Zoom), (float)WIDTH / (float)HEIGHT, 0.1f, 1000.0f);
         MVPM = projection * view;
-        sunView = glm::lookAt(camera.Position + 10000.0f * -sunPos, 
-            camera.Position + float(10000.0 - 1.0) * -sunPos,
+        sunView = glm::lookAt(camera.Position + 5000.0f * sunPos, 
+            camera.Position + 4999.0f * sunPos,
             glm::vec3(0.0f, 1.0f, 0.0f));
-        
+
         // check for errors TODO wrap in a define DEBUG
         /*GLenum err;
         while ((err = glGetError()) != GL_NO_ERROR)
@@ -325,7 +321,7 @@ int main()
             ImGui::SliderFloat("Blue noise rate", &blueNoiseRate, 0.0f, 50.0f);
             ImGui::SliderFloat("Low sample number", &lowSampleNum, 0.0f, 3 * 512.0f);
             ImGui::SliderFloat("High sample number", &highSampleNum, 0.0f, 3 * 1024.0f);
-            ImGui::SliderFloat("Debug value", &debugValue, 0.0f, 1000.0f);
+            ImGui::SliderFloat("Debug value", &debugValue, 0.0f, 1.0f);
             ImGui::ColorEdit3("clear color", (float*)&clear_color);
             ImGui::Text("Cloud render time %f ms/frame", cloudRenderTime);
             ImGui::Text("Position (%.1f, %.1f, %.1f)", camera.Position.x, camera.Position.y, camera.Position.z);
@@ -333,7 +329,40 @@ int main()
             ImGui::End();
         }
 
-        // Write to quarter scaled buffer (1/16 scaled)
+        glViewport(0, 0, ESM_WIDTH, ESM_HEIGHT);
+        glBindFramebuffer(GL_FRAMEBUFFER, ESMfbo);
+        //glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        ESMShader.use();
+        ESMShader.setUniform1f("time", timePassed);
+        ESMShader.setUniform2f("resolution", glm::vec2((float)ESM_WIDTH, (float)ESM_HEIGHT));
+        ESMShader.setUniform3f("sunDirection", sunPos);
+        ESMShader.setUniformMatrix("invView", glm::inverse(sunView));
+        ESMShader.setUniformMatrix("invProj", glm::inverse(sunProjection));
+
+        ESMShader.setUniform1i("perlworl", 0);
+        ESMShader.setUniform1i("worl", 1);
+        ESMShader.setUniform1i("curl", 2);
+        ESMShader.setUniform1i("weather", 3);
+        ESMShader.setUniform1i("blueNoise", 4);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_3D, perlworltex);
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_3D, worltex);
+        glActiveTexture(GL_TEXTURE2);
+        glBindTexture(GL_TEXTURE_2D, curltex);
+        glActiveTexture(GL_TEXTURE3);
+        glBindTexture(GL_TEXTURE_2D, weathertex);
+        glActiveTexture(GL_TEXTURE4);
+        glBindTexture(GL_TEXTURE_2D, blueNoiseTex);
+
+        glBindVertexArray(VAO);
+        glDrawArrays(GL_TRIANGLES, 0, 3);
+        glBindVertexArray(0);
+        
+
+
+        // Write to quarter scaled buffer (1/4 * 1/4 = 1/16 scaled)
         cloudRenderStart = glfwGetTime();
         glBindFramebuffer(GL_FRAMEBUFFER, subbuffer);  // bind fbo, the draw texture is 
         glViewport(0, 0, WIDTH / downscale, HEIGHT / downscale);  // now the downscale is 4, 1/16 scaled image
@@ -350,6 +379,7 @@ int main()
         skyShader.setUniform2f("resolution", glm::vec2((float)WIDTH, (float)HEIGHT));
         skyShader.setUniform3f("cameraPos", camera.Position);
         skyShader.setUniform3f("sunDirection", sunPos);
+        ESMShader.setUniformMatrix("sunView", sunView);
         skyShader.setUniformMatrix("MVPM", MVPM);
         skyShader.setUniformMatrix("invMVPM", invMVPM);
         skyShader.setUniformMatrix("invView", glm::inverse(view));
@@ -361,6 +391,7 @@ int main()
         skyShader.setUniform1i("curl", 2);
         skyShader.setUniform1i("weather", 3);
         skyShader.setUniform1i("blueNoise", 4);
+        skyShader.setUniform1i("ESM", 5);
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_3D, perlworltex);
         glActiveTexture(GL_TEXTURE1);
@@ -371,6 +402,8 @@ int main()
         glBindTexture(GL_TEXTURE_2D, weathertex);
         glActiveTexture(GL_TEXTURE4);
         glBindTexture(GL_TEXTURE_2D, blueNoiseTex);
+        glActiveTexture(GL_TEXTURE5);
+        glBindTexture(GL_TEXTURE_2D, ESMfbotex);
 
         glBindVertexArray(VAO);
         glDrawArrays(GL_TRIANGLES, 0, 3);
@@ -470,13 +503,7 @@ int main()
         glfwSwapBuffers(window);
         // check camera movement
         glfwPollEvents();
-        check++;
-
-        
-        //std::cout << timeStamp[0] << "  " << timeStamp[1] << "  " << timeStamp[2] << "  " << timeStamp[3] 
-        //    << "  " << timeStamp[4] << "  " << timeStamp[5] << "  " << timeStamp[6] << std::endl;
-        
-        
+        check++; 
         
     }   
     
@@ -687,5 +714,35 @@ glm::vec3 getSunPosition(float time)
     float sunposz = sin(phi) * cos(theta);
 
     return glm::vec3(sunposx, sunposy, sunposz);
+}
+
+
+unsigned int quadVAO = 0;
+unsigned int quadVBO;
+void renderQuad()
+{
+    if (quadVAO == 0)
+    {
+        float quadVertices[] = {
+            // positions        // texture Coords
+            -1.0f,  1.0f, 0.0f, 0.0f, 1.0f,
+            -1.0f, -1.0f, 0.0f, 0.0f, 0.0f,
+             1.0f,  1.0f, 0.0f, 1.0f, 1.0f,
+             1.0f, -1.0f, 0.0f, 1.0f, 0.0f,
+        };
+        // setup plane VAO
+        glGenVertexArrays(1, &quadVAO);
+        glGenBuffers(1, &quadVBO);
+        glBindVertexArray(quadVAO);
+        glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
+        glEnableVertexAttribArray(1);
+        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
+    }
+    glBindVertexArray(quadVAO);
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    glBindVertexArray(0);
 }
 #pragma endregion

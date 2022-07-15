@@ -212,7 +212,9 @@ vec3 totalMie( float T ) {
 
 void main() {
 	gl_Position = vec4( position, -1.0, 1.0 );  // here z=-1.0 means in clip sapce, it is on the near plane 
-
+												// in NDC (normalized device coordinate	space) OpenGL uses left-hand coordinate system
+												// while in the former spaces, they use right hand space
+												// the right -> left change happens in the projection matrix (glm functions automatically do this for us)
 	vSunDirection = normalize( sunDirection );
 
 	vSunE = sunIntensity( dot( vSunDirection, up ) );

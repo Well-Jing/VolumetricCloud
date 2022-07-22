@@ -65,8 +65,8 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <None Include="FragmentShader_sky.frag" />
-    <None Include="VertexShader_sky.vert" />
+    <None Include="FragmentShader_sky_secondaryRay.frag" />
+    <None Include="VertexShader_sky_secondaryRay.vert" />
     <None Include="FragmentShader_postprocess.frag" />
     <None Include="VertexShader_postprocess.vert" />
     <None Include="FragmentShader_upscale.frag" />
@@ -74,6 +74,16 @@
     <None Include="FragmentShader_blinnPhong.frag" />
     <None Include="VertexShader_blinnPhong.vert" />
     <None Include="FragmentShader_ESM.frag" />
+    <None Include="VertexShader_gaussianESM.vert" />
+    <None Include="FragmentShader_gaussianESM.frag" />
+    <None Include="FragmentShader_sky_ESM.frag" />
+    <None Include="VertexShader_sky_ESM.vert" />
+    <None Include="VertexShader_BSM.vert" />
+    <None Include="VertexShader_gaussianBSM.vert" />
+    <None Include="VertexShader_sky_BSM.vert" />
+    <None Include="FragmentShader_BSM.frag" />
+    <None Include="FragmentShader_gaussianBSM.frag" />
+    <None Include="FragmentShader_sky_BSM.frag" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Camera.h">

@@ -1,6 +1,7 @@
 #version 330 core
 
 uniform float time;
+uniform float extinction;
 uniform vec2 resolution;
 uniform vec3 sunDirection;
 uniform mat4 invView;
@@ -15,6 +16,9 @@ uniform sampler2D blueNoise;
 const float g_radius = 200000.0; //ground radius
 const float sky_b_radius = 201000.0; //bottom of cloud layer
 const float sky_t_radius = 204000.0; //top of cloud layer 202300.0
+const float c_goldenRatioConjugate = 0.61803398875f;
+
+//const float extinction = 25;
 
 out vec4 color;
 
@@ -79,7 +83,7 @@ vec4 march(vec3 pos, vec3 dir, float stepDist, int numSamples)
 	float depth = 0;
 	const float densityScale = 0.2; // scale the attenuation of cloud
 	const float weatherScale = 0.00005; // original 0.00008
-	const float breakTrans = 0.5;
+	const float breakTrans = 0.95; // hardcode value, can be manipulated by the artists
 
 	//float densitySum = 0;
 
@@ -96,8 +100,8 @@ vec4 march(vec3 pos, vec3 dir, float stepDist, int numSamples)
 		if (totalTrans < breakTrans) break; 
 	}
 
-	return vec4(depth / (stepDist * numSamples));
-	//return vec4(densitySum / numSamples);
+	return vec4(exp(extinction * depth / (stepDist * numSamples)));
+	//return vec4(depth / (stepDist * numSamples));
 }
 
 
@@ -106,13 +110,23 @@ void main()
     vec2 uv = gl_FragCoord.xy / resolution;
     uv = uv-vec2(0.5);
 	uv *= 2.0;
-	vec4 uvdir = vec4(uv.xy, 1.0, 1.0);          
+	vec4 uvdir = vec4(uv.xy, 1.0, 1.0);
 	vec3 worldPos =  vec3(0.0, g_radius, 0.0) + (invView * (invProj * uvdir)).xyz; 
 	//vec4 worldPos = abs(invView *(invProj * uvdir)) / 5000;
 	vec3 dir = -normalize(sunDirection);
 
-	int numStep = 500;
-	int stepDist = 50;
-	vec4 dist = march(worldPos, dir, stepDist, numStep);
-	color = dist;
+	float extinction = 2;
+	int numStep = 100;
+	//float stepDist = 50;
+	float stepDist = 15000 / numStep;
+	//vec4 expDist = exp(extinction * march(worldPos, dir, stepDist, numStep));
+
+	float blueNoiseRate = 20;
+	float blueNoise = texture(blueNoise, gl_FragCoord.xy / 1024.0f).r;
+	vec3 blueNoiseOffset = fract(blueNoise + float(0 * 100) * c_goldenRatioConjugate) * dir * blueNoiseRate;  // use blue noise
+		
+	//vec3 lweather = texture(weather, vec2(0.1f, 0.1f)).xyz;
+	//vec4 volume = march(start + blueNoiseOffset, end, raystep, int(steps));
+	vec4 expDist = march(worldPos + blueNoiseOffset, dir, stepDist, numStep);
+	color = expDist;
 } 

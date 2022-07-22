@@ -64,7 +64,7 @@ GLfloat ASPECT = float(WIDTH) / float(HEIGHT);
 #pragma endregion
 
 #pragma region Shadow Map Attribution
-const GLuint ESM_WIDTH = 512, ESM_HEIGHT = 512;
+const GLuint SHADOWMAP_WIDTH = 512, SHADOWMAP_HEIGHT = 512;
 #pragma endregion
 
 // The MAIN function, from here we start the application and run the game loop
@@ -103,11 +103,16 @@ int main()
     
 #pragma region Create Shader
     //Shader class built on the one in learnopengl.com
-    Shader skyShader("VertexShader_sky.vert", "FragmentShader_sky.frag");
+    Shader skyShaderSecondaryRayMarching("VertexShader_sky_secondaryRay.vert", "FragmentShader_sky_secondaryRay.frag");
+    Shader skyShaderESM("VertexShader_sky_ESM.vert", "FragmentShader_sky_ESM.frag");
+    Shader skyShaderBSM("VertexShader_sky_BSM.vert", "FragmentShader_sky_BSM.frag");
     Shader upscaleShader("VertexShader_upscale.vert", "FragmentShader_upscale.frag");
     Shader postShader("VertexShader_postprocess.vert", "FragmentShader_postprocess.frag");
     Shader blinnPhongShader("VertexShader_blinnPhong.vert", "FragmentShader_blinnPhong.frag");
     Shader ESMShader("VertexShader_ESM.vert", "FragmentShader_ESM.frag");
+    Shader ESMFilteringShader("VertexShader_gaussianESM.vert", "FragmentShader_gaussianESM.frag");
+    Shader BSMShader("VertexShader_BSM.vert", "FragmentShader_BSM.frag");
+    Shader BSMFilteringShader("VertexShader_gaussianBSM.vert", "FragmentShader_gaussianBSM.frag");
 #pragma endregion
 
 #pragma region Light Declaration
@@ -199,14 +204,71 @@ int main()
     glGenFramebuffers(1, &ESMfbo);
     glGenTextures(1, &ESMfbotex);
     glBindTexture(GL_TEXTURE_2D, ESMfbotex);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, ESM_WIDTH, ESM_HEIGHT, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+    //glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, SHADOWMAP_WIDTH, SHADOWMAP_HEIGHT, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, SHADOWMAP_WIDTH, SHADOWMAP_HEIGHT, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_MIRRORED_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_MIRRORED_REPEAT);
     glBindTexture(GL_TEXTURE_2D, 0);
 
     glBindFramebuffer(GL_FRAMEBUFFER, ESMfbo);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, ESMfbotex, 0);
 
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+
+    GLuint ESMGaussianFBO, ESMGaussianFBOTex;
+
+    glGenFramebuffers(1, &ESMGaussianFBO);
+    glGenTextures(1, &ESMGaussianFBOTex);
+    glBindTexture(GL_TEXTURE_2D, ESMGaussianFBOTex);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, SHADOWMAP_WIDTH, SHADOWMAP_HEIGHT, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_MIRRORED_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_MIRRORED_REPEAT);
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+    glBindFramebuffer(GL_FRAMEBUFFER, ESMGaussianFBO);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, ESMGaussianFBOTex, 0);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+
+    // shadow map fbo
+    GLuint BSMfbo, BSMfbotex;
+
+    glGenFramebuffers(1, &BSMfbo);
+    glGenTextures(1, &BSMfbotex);
+    glBindTexture(GL_TEXTURE_2D, BSMfbotex);
+    //glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, SHADOWMAP_WIDTH, SHADOWMAP_HEIGHT, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, SHADOWMAP_WIDTH, SHADOWMAP_HEIGHT, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_MIRRORED_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_MIRRORED_REPEAT);
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+    glBindFramebuffer(GL_FRAMEBUFFER, BSMfbo);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, BSMfbotex, 0);
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+
+    GLuint BSMGaussianFBO, BSMGaussianFBOTex;
+
+    glGenFramebuffers(1, &BSMGaussianFBO);
+    glGenTextures(1, &BSMGaussianFBOTex);
+    glBindTexture(GL_TEXTURE_2D, BSMGaussianFBOTex);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, SHADOWMAP_WIDTH, SHADOWMAP_HEIGHT, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_MIRRORED_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_MIRRORED_REPEAT);
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+    glBindFramebuffer(GL_FRAMEBUFFER, BSMGaussianFBO);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, BSMGaussianFBOTex, 0);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 #pragma endregion
     
@@ -250,21 +312,29 @@ int main()
     
     camera.MovementSpeed = 20;
     float debugValue = 1;
+    int debugValueInt = 1;
 
     float cloudRenderTime = 0;
     float cloudRenderStart;
     float cloudRenderSum = 0;
     int cloudRenderConter = 0;
-    float timeStamp[10];
+    float shadowmapTime = 0;
+    float shadowmapStart;
+    float shadowmapSum = 0;
+    int shadowmapConter = 0;
 
     glm::vec3 sunPos;
     float sunTime = 1.0;
 
     float blueNoiseRate = 14;
-    float lowSampleNum = 70;
-    float highSampleNum = 150;
+    float lowSampleNum = 200;
+    float highSampleNum = 500;
 
     int check = 0; // used for checkerboarding in the upscale shader
+
+    int occlusionMethod = 0;
+    float extinction = 30;
+
     while (!glfwWindowShouldClose(window))
     {
         
@@ -283,7 +353,6 @@ int main()
         lastFrame = currentFrame;
         frames++;
 
-
         // update MVP matrix
         //sunPos = getSunPosition(timePassed);
         sunPos = glm::normalize(getSunPosition(sunTime));
@@ -291,9 +360,12 @@ int main()
         view = camera.getViewMatrix();
         projection = glm::perspective(glm::radians(camera.Zoom), (float)WIDTH / (float)HEIGHT, 0.1f, 1000.0f);
         MVPM = projection * view;
-        sunView = glm::lookAt(camera.Position + 5000.0f * sunPos, 
-            camera.Position + 4999.0f * sunPos,
+        sunView = glm::lookAt(camera.Position + 10000.0f * sunPos, 
+            camera.Position + 9999.0f * sunPos,
             glm::vec3(0.0f, 1.0f, 0.0f));
+        //sunView = glm::lookAt(10000.0f * sunPos,
+        //    9999.0f * sunPos,
+        //    glm::vec3(0.0f, 1.0f, 0.0f));
 
         // check for errors TODO wrap in a define DEBUG
         /*GLenum err;
@@ -314,101 +386,329 @@ int main()
             ImGui::Begin("ImGUI interface");                          // Create a window called "Hello, world!" and append into it.
 
             //ImGui::Checkbox("Show effect with Normal Mapping", &displayBump);
-            //ImGui::Checkbox("Rotate the point light", &rotateLight);
+            if (ImGui::Button("Second ray")) occlusionMethod = 0;
+            ImGui::SameLine();
+            if (ImGui::Button("ESM")) occlusionMethod = 1;
+            ImGui::SameLine();
+            if (ImGui::Button("BSM")) occlusionMethod = 2;
+
             //ImGui::SliderFloat("Light distance", &lightPosScaleRate, 0.3f, 1.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
             ImGui::SliderFloat("Camera speed", &(camera.MovementSpeed), 0.1f, 1000.0f);
             ImGui::SliderFloat("Sun time", &sunTime, 0.0f, 35.0f);
             ImGui::SliderFloat("Blue noise rate", &blueNoiseRate, 0.0f, 50.0f);
             ImGui::SliderFloat("Low sample number", &lowSampleNum, 0.0f, 3 * 512.0f);
             ImGui::SliderFloat("High sample number", &highSampleNum, 0.0f, 3 * 1024.0f);
-            ImGui::SliderFloat("Debug value", &debugValue, 0.0f, 1.0f);
+            ImGui::SliderFloat("Debug value", &debugValue, 0.0f, 100.0f);
+            ImGui::SliderInt("Debug value int", &debugValueInt, 0, 30);
             ImGui::ColorEdit3("clear color", (float*)&clear_color);
             ImGui::Text("Cloud render time %f ms/frame", cloudRenderTime);
+            ImGui::Text("Shadow map generate time %f ms/frame", shadowmapTime);
             ImGui::Text("Position (%.1f, %.1f, %.1f)", camera.Position.x, camera.Position.y, camera.Position.z);
             ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
             ImGui::End();
         }
+    
+        if (occlusionMethod == 0)
+        {
+            glFinish();
+            cloudRenderStart = glfwGetTime();
+            glBindFramebuffer(GL_FRAMEBUFFER, subbuffer);  // bind fbo, the draw texture is 
+            glViewport(0, 0, WIDTH / downscale, HEIGHT / downscale);  // now the downscale is 4, 1/16 scaled image
+            glDepthMask(GL_FALSE);
+            skyShaderSecondaryRayMarching.use();
+            skyShaderSecondaryRayMarching.setUniform1i("check", check % downscalesq);
+            skyShaderSecondaryRayMarching.setUniform1i("debugValueInt", debugValueInt);
+            skyShaderSecondaryRayMarching.setUniform1f("time", timePassed);
+            skyShaderSecondaryRayMarching.setUniform1f("aspect", ASPECT);
+            skyShaderSecondaryRayMarching.setUniform1f("downscale", (float)downscale);
+            skyShaderSecondaryRayMarching.setUniform1f("blueNoiseRate", blueNoiseRate);
+            skyShaderSecondaryRayMarching.setUniform1f("debugValue", debugValue);
+            skyShaderSecondaryRayMarching.setUniform1f("lowSampleNum", lowSampleNum);
+            skyShaderSecondaryRayMarching.setUniform1f("highSampleNum", highSampleNum);
+            skyShaderSecondaryRayMarching.setUniform2f("resolution", glm::vec2((float)WIDTH, (float)HEIGHT));
+            skyShaderSecondaryRayMarching.setUniform3f("cameraPos", camera.Position);
+            skyShaderSecondaryRayMarching.setUniform3f("sunDirection", sunPos);
+            skyShaderSecondaryRayMarching.setUniformMatrix("sunView", sunView);
+            skyShaderSecondaryRayMarching.setUniformMatrix("sunProj", sunProjection);
+            skyShaderSecondaryRayMarching.setUniformMatrix("MVPM", MVPM);
+            skyShaderSecondaryRayMarching.setUniformMatrix("invMVPM", invMVPM);
+            skyShaderSecondaryRayMarching.setUniformMatrix("invView", glm::inverse(view));
+            skyShaderSecondaryRayMarching.setUniformMatrix("invProj", glm::inverse(projection));
 
-        glViewport(0, 0, ESM_WIDTH, ESM_HEIGHT);
-        glBindFramebuffer(GL_FRAMEBUFFER, ESMfbo);
-        //glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        ESMShader.use();
-        ESMShader.setUniform1f("time", timePassed);
-        ESMShader.setUniform2f("resolution", glm::vec2((float)ESM_WIDTH, (float)ESM_HEIGHT));
-        ESMShader.setUniform3f("sunDirection", sunPos);
-        ESMShader.setUniformMatrix("invView", glm::inverse(sunView));
-        ESMShader.setUniformMatrix("invProj", glm::inverse(sunProjection));
+            // set textures (weather + noise)
+            skyShaderSecondaryRayMarching.setUniform1i("perlworl", 0);
+            skyShaderSecondaryRayMarching.setUniform1i("worl", 1);
+            skyShaderSecondaryRayMarching.setUniform1i("curl", 2);
+            skyShaderSecondaryRayMarching.setUniform1i("weather", 3);
+            skyShaderSecondaryRayMarching.setUniform1i("blueNoise", 4);
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_3D, perlworltex);
+            glActiveTexture(GL_TEXTURE1);
+            glBindTexture(GL_TEXTURE_3D, worltex);
+            glActiveTexture(GL_TEXTURE2);
+            glBindTexture(GL_TEXTURE_2D, curltex);
+            glActiveTexture(GL_TEXTURE3);
+            glBindTexture(GL_TEXTURE_2D, weathertex);
+            glActiveTexture(GL_TEXTURE4);
+            glBindTexture(GL_TEXTURE_2D, blueNoiseTex);
 
-        ESMShader.setUniform1i("perlworl", 0);
-        ESMShader.setUniform1i("worl", 1);
-        ESMShader.setUniform1i("curl", 2);
-        ESMShader.setUniform1i("weather", 3);
-        ESMShader.setUniform1i("blueNoise", 4);
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_3D, perlworltex);
-        glActiveTexture(GL_TEXTURE1);
-        glBindTexture(GL_TEXTURE_3D, worltex);
-        glActiveTexture(GL_TEXTURE2);
-        glBindTexture(GL_TEXTURE_2D, curltex);
-        glActiveTexture(GL_TEXTURE3);
-        glBindTexture(GL_TEXTURE_2D, weathertex);
-        glActiveTexture(GL_TEXTURE4);
-        glBindTexture(GL_TEXTURE_2D, blueNoiseTex);
+            glBindVertexArray(VAO);
+            glDrawArrays(GL_TRIANGLES, 0, 3);
+            glBindVertexArray(0);
+        }
 
-        glBindVertexArray(VAO);
-        glDrawArrays(GL_TRIANGLES, 0, 3);
-        glBindVertexArray(0);
-        
+        if (occlusionMethod == 1)
+        {
+            glFinish();
+            cloudRenderStart = glfwGetTime();
+
+            glFinish();
+            shadowmapStart = glfwGetTime();
+            glViewport(0, 0, SHADOWMAP_WIDTH, SHADOWMAP_HEIGHT);
+            glBindFramebuffer(GL_FRAMEBUFFER, ESMfbo);
+            ESMShader.use();            
+            ESMShader.setUniform1f("time", timePassed);
+            ESMShader.setUniform1f("extinction", extinction);
+            ESMShader.setUniform2f("resolution", glm::vec2((float)SHADOWMAP_WIDTH, (float)SHADOWMAP_HEIGHT));
+            ESMShader.setUniform3f("sunDirection", sunPos);
+            ESMShader.setUniformMatrix("invView", glm::inverse(sunView));
+            ESMShader.setUniformMatrix("invProj", glm::inverse(sunProjection));
+            
+            ESMShader.setUniform1i("perlworl", 0);
+            ESMShader.setUniform1i("worl", 1);
+            ESMShader.setUniform1i("curl", 2);
+            ESMShader.setUniform1i("weather", 3);
+            ESMShader.setUniform1i("blueNoise", 4);
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_3D, perlworltex);
+            glActiveTexture(GL_TEXTURE1);
+            glBindTexture(GL_TEXTURE_3D, worltex);
+            glActiveTexture(GL_TEXTURE2);
+            glBindTexture(GL_TEXTURE_2D, curltex);
+            glActiveTexture(GL_TEXTURE3);
+            glBindTexture(GL_TEXTURE_2D, weathertex);
+            glActiveTexture(GL_TEXTURE4);
+            glBindTexture(GL_TEXTURE_2D, blueNoiseTex);
+
+            glBindVertexArray(VAO);
+            glDrawArrays(GL_TRIANGLES, 0, 3);
+            glBindVertexArray(0);
+            
+            glBindFramebuffer(GL_FRAMEBUFFER, ESMGaussianFBO);
+            ESMFilteringShader.use();
+            ESMFilteringShader.setUniformBool("gaussianDir", false);
+            ESMFilteringShader.setUniform1i("kernelRadius", 6);
+            ESMFilteringShader.setUniform1f("sigma", 18);
+
+            ESMFilteringShader.setUniform1i("fbo", 0);
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, ESMfbotex);
+
+            glBindVertexArray(VAO);
+            glDrawArrays(GL_TRIANGLES, 0, 3);
+            glBindVertexArray(0);
+
+            glBindFramebuffer(GL_FRAMEBUFFER, ESMfbo);
+            ESMFilteringShader.use();
+            ESMFilteringShader.setUniformBool("gaussianDir", true);
+            ESMFilteringShader.setUniform1i("kernelRadius", 6);
+            ESMFilteringShader.setUniform1f("sigma", 18);
+
+            ESMFilteringShader.setUniform1i("fbo", 0);
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, ESMGaussianFBOTex);
+
+            glBindVertexArray(VAO);
+            glDrawArrays(GL_TRIANGLES, 0, 3);
+            glBindVertexArray(0);
+
+            glFinish();
+            shadowmapSum += (glfwGetTime() - shadowmapStart) * 1000;
+            shadowmapConter++;
+            if (shadowmapConter % 60 == 0)
+            {
+                shadowmapTime = shadowmapSum / 60;
+                shadowmapSum = 0;
+            }
+            
+            
+
+            // Write to quarter scaled buffer (1/4 * 1/4 = 1/16 scaled)
+            glBindFramebuffer(GL_FRAMEBUFFER, subbuffer);  // bind fbo, the draw texture is 
+            glViewport(0, 0, WIDTH / downscale, HEIGHT / downscale);  // now the downscale is 4, 1/16 scaled image
+            glDepthMask(GL_FALSE);
+            skyShaderESM.use();
+            skyShaderESM.setUniform1i("check", check % downscalesq);
+            skyShaderESM.setUniform1i("debugValueInt", debugValueInt);
+            skyShaderESM.setUniform1f("time", timePassed);
+            skyShaderESM.setUniform1f("aspect", ASPECT);
+            skyShaderESM.setUniform1f("downscale", (float)downscale);
+            skyShaderESM.setUniform1f("blueNoiseRate", blueNoiseRate);
+            skyShaderESM.setUniform1f("debugValue", debugValue);
+            skyShaderESM.setUniform1f("lowSampleNum", lowSampleNum);
+            skyShaderESM.setUniform1f("highSampleNum", highSampleNum);
+            skyShaderESM.setUniform1f("extinction", extinction);
+            skyShaderESM.setUniform2f("resolution", glm::vec2((float)WIDTH, (float)HEIGHT));
+            skyShaderESM.setUniform3f("cameraPos", camera.Position);
+            skyShaderESM.setUniform3f("sunDirection", sunPos);
+            skyShaderESM.setUniformMatrix("sunView", sunView);
+            skyShaderESM.setUniformMatrix("sunProj", sunProjection);
+            skyShaderESM.setUniformMatrix("MVPM", MVPM);
+            skyShaderESM.setUniformMatrix("invMVPM", invMVPM);
+            skyShaderESM.setUniformMatrix("invView", glm::inverse(view));
+            skyShaderESM.setUniformMatrix("invProj", glm::inverse(projection));
+
+            // set textures (weather + noise)
+            skyShaderESM.setUniform1i("perlworl", 0);
+            skyShaderESM.setUniform1i("worl", 1);
+            skyShaderESM.setUniform1i("curl", 2);
+            skyShaderESM.setUniform1i("weather", 3);
+            skyShaderESM.setUniform1i("blueNoise", 4);
+            skyShaderESM.setUniform1i("ESM", 5);
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_3D, perlworltex);
+            glActiveTexture(GL_TEXTURE1);
+            glBindTexture(GL_TEXTURE_3D, worltex);
+            glActiveTexture(GL_TEXTURE2);
+            glBindTexture(GL_TEXTURE_2D, curltex);
+            glActiveTexture(GL_TEXTURE3);
+            glBindTexture(GL_TEXTURE_2D, weathertex);
+            glActiveTexture(GL_TEXTURE4);
+            glBindTexture(GL_TEXTURE_2D, blueNoiseTex);
+            glActiveTexture(GL_TEXTURE5);
+            glBindTexture(GL_TEXTURE_2D, ESMfbotex);
+
+            glBindVertexArray(VAO);
+            glDrawArrays(GL_TRIANGLES, 0, 3);
+            glBindVertexArray(0);
+
+            
+        }
+
+        if (occlusionMethod == 2)
+        {
+            glFinish();
+            cloudRenderStart = glfwGetTime();
+
+            glFinish();
+            shadowmapStart = glfwGetTime();
+            glViewport(0, 0, SHADOWMAP_WIDTH, SHADOWMAP_HEIGHT);
+            glBindFramebuffer(GL_FRAMEBUFFER, BSMfbo);
+            BSMShader.use();
+            BSMShader.setUniform1f("time", timePassed);
+            BSMShader.setUniform1f("extinction", extinction);
+            BSMShader.setUniform2f("resolution", glm::vec2((float)SHADOWMAP_WIDTH, (float)SHADOWMAP_HEIGHT));
+            BSMShader.setUniform3f("sunDirection", sunPos);
+            BSMShader.setUniformMatrix("invView", glm::inverse(sunView));
+            BSMShader.setUniformMatrix("invProj", glm::inverse(sunProjection));
+
+            BSMShader.setUniform1i("perlworl", 0);
+            BSMShader.setUniform1i("worl", 1);
+            BSMShader.setUniform1i("curl", 2);
+            BSMShader.setUniform1i("weather", 3);
+            BSMShader.setUniform1i("blueNoise", 4);
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_3D, perlworltex);
+            glActiveTexture(GL_TEXTURE1);
+            glBindTexture(GL_TEXTURE_3D, worltex);
+            glActiveTexture(GL_TEXTURE2);
+            glBindTexture(GL_TEXTURE_2D, curltex);
+            glActiveTexture(GL_TEXTURE3);
+            glBindTexture(GL_TEXTURE_2D, weathertex);
+            glActiveTexture(GL_TEXTURE4);
+            glBindTexture(GL_TEXTURE_2D, blueNoiseTex);
+
+            glBindVertexArray(VAO);
+            glDrawArrays(GL_TRIANGLES, 0, 3);
+            glBindVertexArray(0);
+
+            glBindFramebuffer(GL_FRAMEBUFFER, BSMGaussianFBO);
+            BSMFilteringShader.use();
+            BSMFilteringShader.setUniformBool("gaussianDir", false);
+            BSMFilteringShader.setUniform1i("kernelRadius", 6);
+            BSMFilteringShader.setUniform1f("sigma", 18);
+
+            BSMFilteringShader.setUniform1i("fbo", 0);
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, BSMfbotex);
+
+            glBindVertexArray(VAO);
+            glDrawArrays(GL_TRIANGLES, 0, 3);
+            glBindVertexArray(0);
+
+            glBindFramebuffer(GL_FRAMEBUFFER, BSMfbo);
+            BSMFilteringShader.use();
+            BSMFilteringShader.setUniformBool("gaussianDir", true);
+            BSMFilteringShader.setUniform1i("kernelRadius", 6);
+            BSMFilteringShader.setUniform1f("sigma", 18);
+
+            BSMFilteringShader.setUniform1i("fbo", 0);
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, BSMGaussianFBOTex);
+
+            glBindVertexArray(VAO);
+            glDrawArrays(GL_TRIANGLES, 0, 3);
+            glBindVertexArray(0);
+
+            glFinish();
+            shadowmapSum += (glfwGetTime() - shadowmapStart) * 1000;
+            shadowmapConter++;
+            if (shadowmapConter % 60 == 0)
+            {
+                shadowmapTime = shadowmapSum / 60;
+                shadowmapSum = 0;
+            }
 
 
-        // Write to quarter scaled buffer (1/4 * 1/4 = 1/16 scaled)
-        cloudRenderStart = glfwGetTime();
-        glBindFramebuffer(GL_FRAMEBUFFER, subbuffer);  // bind fbo, the draw texture is 
-        glViewport(0, 0, WIDTH / downscale, HEIGHT / downscale);  // now the downscale is 4, 1/16 scaled image
-        glDepthMask(GL_FALSE);
-        skyShader.use();
-        skyShader.setUniform1i("check", check % downscalesq);
-        skyShader.setUniform1f("time", timePassed);
-        skyShader.setUniform1f("aspect", ASPECT);
-        skyShader.setUniform1f("downscale", (float)downscale);
-        skyShader.setUniform1f("blueNoiseRate", blueNoiseRate);
-        skyShader.setUniform1f("debugValue", debugValue);
-        skyShader.setUniform1f("lowSampleNum", lowSampleNum);
-        skyShader.setUniform1f("highSampleNum", highSampleNum);
-        skyShader.setUniform2f("resolution", glm::vec2((float)WIDTH, (float)HEIGHT));
-        skyShader.setUniform3f("cameraPos", camera.Position);
-        skyShader.setUniform3f("sunDirection", sunPos);
-        ESMShader.setUniformMatrix("sunView", sunView);
-        skyShader.setUniformMatrix("MVPM", MVPM);
-        skyShader.setUniformMatrix("invMVPM", invMVPM);
-        skyShader.setUniformMatrix("invView", glm::inverse(view));
-        skyShader.setUniformMatrix("invProj", glm::inverse(projection));
+            // Write to quarter scaled buffer (1/4 * 1/4 = 1/16 scaled)
+            glBindFramebuffer(GL_FRAMEBUFFER, subbuffer);  // bind fbo, the draw texture is 
+            glViewport(0, 0, WIDTH / downscale, HEIGHT / downscale);  // now the downscale is 4, 1/16 scaled image
+            glDepthMask(GL_FALSE);
+            skyShaderBSM.use();
+            skyShaderBSM.setUniform1i("check", check % downscalesq);
+            skyShaderBSM.setUniform1i("debugValueInt", debugValueInt);
+            skyShaderBSM.setUniform1f("time", timePassed);
+            skyShaderBSM.setUniform1f("aspect", ASPECT);
+            skyShaderBSM.setUniform1f("downscale", (float)downscale);
+            skyShaderBSM.setUniform1f("blueNoiseRate", blueNoiseRate);
+            skyShaderBSM.setUniform1f("debugValue", debugValue);
+            skyShaderBSM.setUniform1f("lowSampleNum", lowSampleNum);
+            skyShaderBSM.setUniform1f("highSampleNum", highSampleNum);
+            skyShaderBSM.setUniform1f("extinction", extinction);
+            skyShaderBSM.setUniform2f("resolution", glm::vec2((float)WIDTH, (float)HEIGHT));
+            skyShaderBSM.setUniform3f("cameraPos", camera.Position);
+            skyShaderBSM.setUniform3f("sunDirection", sunPos);
+            skyShaderBSM.setUniformMatrix("sunView", sunView);
+            skyShaderBSM.setUniformMatrix("sunProj", sunProjection);
+            skyShaderBSM.setUniformMatrix("MVPM", MVPM);
+            skyShaderBSM.setUniformMatrix("invMVPM", invMVPM);
+            skyShaderBSM.setUniformMatrix("invView", glm::inverse(view));
+            skyShaderBSM.setUniformMatrix("invProj", glm::inverse(projection));
 
-        // set textures (weather + noise)
-        skyShader.setUniform1i("perlworl", 0);
-        skyShader.setUniform1i("worl", 1);
-        skyShader.setUniform1i("curl", 2);
-        skyShader.setUniform1i("weather", 3);
-        skyShader.setUniform1i("blueNoise", 4);
-        skyShader.setUniform1i("ESM", 5);
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_3D, perlworltex);
-        glActiveTexture(GL_TEXTURE1);
-        glBindTexture(GL_TEXTURE_3D, worltex);
-        glActiveTexture(GL_TEXTURE2);
-        glBindTexture(GL_TEXTURE_2D, curltex);
-        glActiveTexture(GL_TEXTURE3);
-        glBindTexture(GL_TEXTURE_2D, weathertex);
-        glActiveTexture(GL_TEXTURE4);
-        glBindTexture(GL_TEXTURE_2D, blueNoiseTex);
-        glActiveTexture(GL_TEXTURE5);
-        glBindTexture(GL_TEXTURE_2D, ESMfbotex);
+            // set textures (weather + noise)
+            skyShaderBSM.setUniform1i("perlworl", 0);
+            skyShaderBSM.setUniform1i("worl", 1);
+            skyShaderBSM.setUniform1i("curl", 2);
+            skyShaderBSM.setUniform1i("weather", 3);
+            skyShaderBSM.setUniform1i("blueNoise", 4);
+            skyShaderBSM.setUniform1i("BSM", 5);
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_3D, perlworltex);
+            glActiveTexture(GL_TEXTURE1);
+            glBindTexture(GL_TEXTURE_3D, worltex);
+            glActiveTexture(GL_TEXTURE2);
+            glBindTexture(GL_TEXTURE_2D, curltex);
+            glActiveTexture(GL_TEXTURE3);
+            glBindTexture(GL_TEXTURE_2D, weathertex);
+            glActiveTexture(GL_TEXTURE4);
+            glBindTexture(GL_TEXTURE_2D, blueNoiseTex);
+            glActiveTexture(GL_TEXTURE5);
+            glBindTexture(GL_TEXTURE_2D, BSMfbotex);
 
-        glBindVertexArray(VAO);
-        glDrawArrays(GL_TRIANGLES, 0, 3);
-        glBindVertexArray(0);
-        
+            glBindVertexArray(VAO);
+            glDrawArrays(GL_TRIANGLES, 0, 3);
+            glBindVertexArray(0);
+        }
 
         // upscale the buffer into full size framebuffer
         glBindFramebuffer(GL_FRAMEBUFFER, fbo);
@@ -462,6 +762,7 @@ int main()
         glBindVertexArray(0);
         glDepthMask(GL_TRUE);
 
+        glFinish();
         cloudRenderSum += (glfwGetTime() - cloudRenderStart) * 1000;
         cloudRenderConter++;
         if (cloudRenderConter % 60 == 0)

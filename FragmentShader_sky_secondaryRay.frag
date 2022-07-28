@@ -357,7 +357,7 @@ float density(vec3 p, vec3 weather, const bool hq, const float LOD)
 {
 	float heightFraction = GetHeightFractionForPoint(length(p)); // the p should be used before times time, otherwise, the p will become much higher than the sky top, there is no cloud
 	p.z += time * 0;
-	vec4 lowNoise = textureLod(perlworl, p * 0.0003, LOD);  //textureLod and texture function are similar, I still do not understand the difference
+	vec4 lowNoise = textureLod(perlworl, p * 0.00035, LOD);  //textureLod and texture function are similar, I still do not understand the difference
 	float fbm = lowNoise.g*0.625 + lowNoise.b*0.25 + lowNoise.a*0.125;
 	//float g = densityHeightGradient(height_fraction, 0.5);  // why the cloud type is only one type ??? why do not use the weather map?
 	float gradient = densityHeightGradient(heightFraction, clamp(pow(weather.b, 1.8), 0, 1));
@@ -370,7 +370,7 @@ float density(vec3 p, vec3 weather, const bool hq, const float LOD)
 	{
 		//vec2 whisp = texture(curl, p.xy * 0.0003).xy;
 		//p.xy += whisp * 400.0 * (1.0 - heightFraction);
-		vec3 highNoise = texture(worl, p * 0.001, LOD - 2.0).xyz; // origianl speed 0.004
+		vec3 highNoise = texture(worl, p * 0.00011, LOD - 2.0).xyz; // origianl speed 0.004
 		float hfbm = highNoise.r*0.625 + highNoise.g*0.25 + highNoise.b*0.125;
 		hfbm = mix(hfbm, 1.0 - hfbm, clamp(heightFraction * 3.0, 0.0, 1.0));
 		base_cloud = remap(base_cloud, hfbm * 0.2, 1.0, 0.0, 1.0);
@@ -378,27 +378,46 @@ float density(vec3 p, vec3 weather, const bool hq, const float LOD)
 	return clamp(base_cloud, 0.0, 1.0);
 }
 
-float getLight(vec3 p, vec3 secondRayDir, float weatherScale, float densityScale)
+float getLight(vec3 p, vec3 secondRayDir, vec3 viewDir, float weatherScale, float densityScale)
 {
 	vec3 secondRayPos = p;
 	float secondRayDensity;
 	float densitySum = 0.0;
-	secondRayDir = 100 * normalize(secondRayDir);
-	for (int j = 0; j < 10; j++) 
+	//secondRayDir = 100 * normalize(secondRayDir);
+	secondRayDir = 10 * normalize(secondRayDir);
+
+	//float beers = 1;
+	//float powder = 1;
+	for (int j = 0; j < 10; j++) // 40 can render most shadow
 	{
-		secondRayPos += secondRayDir;
+		secondRayPos += (j+1) *secondRayDir;
+		//secondRayPos += secondRayDir;
 		vec3 secondRayWeather = texture(weather, secondRayPos.xz * weatherScale).xyz;
-		densitySum += density(secondRayPos, secondRayWeather, false, float(j));
+		//densitySum += density(secondRayPos, secondRayWeather, false, float(j));
+		densitySum += density(secondRayPos, secondRayWeather, false, float(j)) * (j+1) * length(secondRayDir);
+		//float tempDensity = density(secondRayPos, secondRayWeather, false, float(j));
+		//beers *= max(exp(-densityScale * tempDensity * length(secondRayDir)), 
+		//				exp(-densityScale * tempDensity * length(secondRayDir) * 0.25 ) * 0.7);
+		//powder *= 1.0 - exp(-densityScale * tempDensity * length(secondRayDir) * 2.0);
 	}
+
+	densitySum /= length(secondRayDir);
 
 	float heightFraction = GetHeightFractionForPoint(p.y);
 	vec3 ambient = 5.0 * vAmbient * mix(0.15, 1.0, heightFraction);
 	float beers = max(exp(-densityScale * densitySum * length(secondRayDir)), 
 						exp(-densityScale * densitySum * length(secondRayDir) * 0.25 ) * 0.7);  // this is from Nubis 2017 siggraph course
-	//float powder = 1.0 - exp(-densityScale * densitySum * secondRayDistance * 2.0);
-	//float beersPowder = 2 * beers * powder; // here times 2.0 to approximate a good effect (check GPU Pro 360 Guide to lighting)
-	float beersPowder = beers; // we can add powder effect in the future
+	float powder = 1.0 - exp(-densityScale * densitySum * length(secondRayDir) * 2);
+	//float powder = 1.0 - exp(-densityScale / debugValue * densitySum * length(secondRayDir));
+	//powder = 1 - beers*beers;
+	float beersPowder = mix(mix(beers, 2 * beers * powder, pow(clamp(-dot(normalize(viewDir), normalize(secondRayDir)), 0, 1), 1)), beers, debugValue); // here times 2.0 to approximate a good effect (check GPU Pro 360 Guide to lighting)
+	//float beersPowder = powder; // here times 2.0 to approximate a good effect (check GPU Pro 360 Guide to lighting)
+	//float beersPowder2 = mix(beers, powder, debugValue); // we can add powder effect in the future
+	//return beersPowder2;
 
+	//float beersPowder = beers;
+	//float beersPowder = powder;
+	//return mix(beers, beersPowder, debugValue);
 	return beersPowder;
 }
 
@@ -412,11 +431,13 @@ vec4 march(const vec3 pos, const vec3 end, vec3 dir, const int numSamples)
 	float secondRayDistance = atomThickness / float(numSamples);  // secondary ray-marching step length?
 	vec3 secondRayDir = vSunDirection * stepDistance;          // direction towards sun? I think this is inverse, but when added -, the result looks strange
 	vec3 L = vec3(0.0f); 
-	const float densityScale = 0.15; // scale the attenuation of cloud
+	//const float densityScale = 0.15; // scale the attenuation of cloud
+	const float densityScale = 0.2; // scale the attenuation of cloud
 	float costheta = dot(normalize(secondRayDir), normalize(dir)); // the angle between view ray (first) and light ray (secondary)
 	float phase = max(HG(costheta, 0.6), 1.4 * HG(costheta, 0.99 - 0.4)); // this is from Nubis 2017 siggraph course
 	phase = mix(phase, HG(costheta, -0.5), 0.3); // when look along the sun light direction (from Frostbite 2016 talk)
-	const float weatherScale = 0.00005; // original 0.00008 // 0.00005 is beautiful!!!
+	const float weatherScale = 0.00006; // original 0.00008 // 0.00005 is beautiful!!!
+	//float weatherScale = 0.00001 * debugValue; // original 0.00008 // 0.00005 is beautiful!!!
 
 	int counter = 0;
 
@@ -432,7 +453,7 @@ vec4 march(const vec3 pos, const vec3 end, vec3 dir, const int numSamples)
 		if (viewRayDensity > 0.0)  //calculate lighting, but only when we are in a non-zero density point (when there is cloud)
 		{ 
 			counter++;
-			float beers = getLight(p, secondRayDir, weatherScale, densityScale);
+			float beers = getLight(p, secondRayDir, dir, weatherScale, densityScale);
 			float heightFraction = GetHeightFractionForPoint(p.y);
 			vec3 ambient = 5.0 * vAmbient * mix(0.15, 1.0, heightFraction);
 			vec3 sunC = pow(vSunColor, vec3(0.75)); // sun color
@@ -441,7 +462,7 @@ vec4 march(const vec3 pos, const vec3 end, vec3 dir, const int numSamples)
 		}
 	}
 
-	if ((counter > 0 && counter < 10 && totalTrans > 0.6) || (counter > 0 && alpha < 0.05)) return vec4(L, pow(0.2, max(6 - counter, counter)));
+	//if ((counter > 0 && counter < 10 && totalTrans > 0.6) || (counter > 0 && alpha < 0.05)) return vec4(L, pow(0.2, max(6 - counter, counter)));
 	return vec4(L, alpha);
 }
 

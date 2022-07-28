@@ -56,6 +56,8 @@ GLfloat startTime = 0.0f;
 #pragma region Window Attribution
 // Window dimensions
 const GLuint WIDTH = 1280, HEIGHT = 720;  // both the width and height should be multiple of 16
+//const GLuint WIDTH = 1920, HEIGHT = 1088;  // both the width and height should be multiple of 16, so 1080->1088
+//const GLuint WIDTH = 2560, HEIGHT = 1440;  // both the width and height should be multiple of 16
 //const GLuint WIDTH = 512 * 2.0, HEIGHT = 512 * 2.0; // if the window is not square, some antefacts show up
 const GLuint downscale = 2; //4 is best//any more and the gains dont make up for the lag
 GLuint downscalesq = downscale * downscale;
@@ -106,6 +108,7 @@ int main()
     Shader skyShaderSecondaryRayMarching("VertexShader_sky_secondaryRay.vert", "FragmentShader_sky_secondaryRay.frag");
     Shader skyShaderESM("VertexShader_sky_ESM.vert", "FragmentShader_sky_ESM.frag");
     Shader skyShaderBSM("VertexShader_sky_BSM.vert", "FragmentShader_sky_BSM.frag");
+    Shader skyShaderFOM("VertexShader_sky_FOM.vert", "FragmentShader_sky_FOM.frag");
     Shader upscaleShader("VertexShader_upscale.vert", "FragmentShader_upscale.frag");
     Shader postShader("VertexShader_postprocess.vert", "FragmentShader_postprocess.frag");
     Shader blinnPhongShader("VertexShader_blinnPhong.vert", "FragmentShader_blinnPhong.frag");
@@ -113,6 +116,8 @@ int main()
     Shader ESMFilteringShader("VertexShader_gaussianESM.vert", "FragmentShader_gaussianESM.frag");
     Shader BSMShader("VertexShader_BSM.vert", "FragmentShader_BSM.frag");
     Shader BSMFilteringShader("VertexShader_gaussianBSM.vert", "FragmentShader_gaussianBSM.frag");
+    Shader FOMShader("VertexShader_FOM.vert", "FragmentShader_FOM.frag");
+    Shader FOMFilteringShader("VertexShader_gaussianFOM.vert", "FragmentShader_gaussianFOM.frag");
 #pragma endregion
 
 #pragma region Light Declaration
@@ -159,8 +164,8 @@ int main()
     glGenTextures(1, &fbotex);
     glBindTexture(GL_TEXTURE_2D, fbotex);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, WIDTH, HEIGHT, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glBindTexture(GL_TEXTURE_2D, 0);
 
     glBindFramebuffer(GL_FRAMEBUFFER, fbo);
@@ -174,8 +179,8 @@ int main()
     glGenTextures(1, &copyfbotex);
     glBindTexture(GL_TEXTURE_2D, copyfbotex);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, WIDTH, HEIGHT, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glBindTexture(GL_TEXTURE_2D, 0);
 
     glBindFramebuffer(GL_FRAMEBUFFER, copyfbo);
@@ -189,8 +194,8 @@ int main()
     glGenTextures(1, &subbuffertex);
     glBindTexture(GL_TEXTURE_2D, subbuffertex);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, WIDTH / downscale, HEIGHT / downscale, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glBindTexture(GL_TEXTURE_2D, 0);
@@ -198,7 +203,7 @@ int main()
     glBindFramebuffer(GL_FRAMEBUFFER, subbuffer);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, subbuffertex, 0);
 
-    // shadow map fbo
+    // Exponential Shadow Map shadow map fbo
     GLuint ESMfbo, ESMfbotex;
 
     glGenFramebuffers(1, &ESMfbo);
@@ -206,8 +211,8 @@ int main()
     glBindTexture(GL_TEXTURE_2D, ESMfbotex);
     //glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, SHADOWMAP_WIDTH, SHADOWMAP_HEIGHT, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, SHADOWMAP_WIDTH, SHADOWMAP_HEIGHT, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_MIRRORED_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_MIRRORED_REPEAT);
     glBindTexture(GL_TEXTURE_2D, 0);
@@ -224,8 +229,8 @@ int main()
     glGenTextures(1, &ESMGaussianFBOTex);
     glBindTexture(GL_TEXTURE_2D, ESMGaussianFBOTex);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, SHADOWMAP_WIDTH, SHADOWMAP_HEIGHT, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_MIRRORED_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_MIRRORED_REPEAT);
     glBindTexture(GL_TEXTURE_2D, 0);
@@ -235,7 +240,7 @@ int main()
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
 
-    // shadow map fbo
+    // Beer Shadow Map shadow map fbo
     GLuint BSMfbo, BSMfbotex;
 
     glGenFramebuffers(1, &BSMfbo);
@@ -243,8 +248,8 @@ int main()
     glBindTexture(GL_TEXTURE_2D, BSMfbotex);
     //glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, SHADOWMAP_WIDTH, SHADOWMAP_HEIGHT, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, SHADOWMAP_WIDTH, SHADOWMAP_HEIGHT, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_MIRRORED_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_MIRRORED_REPEAT);
     glBindTexture(GL_TEXTURE_2D, 0);
@@ -261,14 +266,60 @@ int main()
     glGenTextures(1, &BSMGaussianFBOTex);
     glBindTexture(GL_TEXTURE_2D, BSMGaussianFBOTex);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, SHADOWMAP_WIDTH, SHADOWMAP_HEIGHT, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_MIRRORED_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_MIRRORED_REPEAT);
     glBindTexture(GL_TEXTURE_2D, 0);
 
     glBindFramebuffer(GL_FRAMEBUFFER, BSMGaussianFBO);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, BSMGaussianFBOTex, 0);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+
+    // Fourier Opacity Map shadow map fbo
+    GLuint FOMfbo;
+    glGenFramebuffers(1, &FOMfbo);
+    glBindFramebuffer(GL_FRAMEBUFFER, FOMfbo);
+    GLuint attachments[2] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
+    glDrawBuffers(2, attachments);
+
+    GLuint FOMfbotex[2];
+    glGenTextures(2, FOMfbotex);
+    for (unsigned int i = 0; i < 2; i++)
+    {
+        glBindTexture(GL_TEXTURE_2D, FOMfbotex[i]);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, SHADOWMAP_WIDTH, SHADOWMAP_HEIGHT, 0, GL_RGBA, GL_FLOAT, NULL);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_MIRRORED_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_MIRRORED_REPEAT);
+        // attach texture to framebuffer
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + i, GL_TEXTURE_2D, FOMfbotex[i], 0);
+    }
+    glBindTexture(GL_TEXTURE_2D, 0);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+
+    GLuint FOMGaussianFBO;
+    glGenFramebuffers(1, &FOMGaussianFBO);
+    glBindFramebuffer(GL_FRAMEBUFFER, FOMGaussianFBO);
+    glDrawBuffers(2, attachments);
+
+    GLuint FOMGaussianFBOTex[2];
+    glGenTextures(2, FOMGaussianFBOTex);
+    for (unsigned int i = 0; i < 2; i++)
+    {
+        glBindTexture(GL_TEXTURE_2D, FOMGaussianFBOTex[i]);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, SHADOWMAP_WIDTH, SHADOWMAP_HEIGHT, 0, GL_RGBA, GL_FLOAT, NULL);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_MIRRORED_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_MIRRORED_REPEAT);
+        // attach texture to framebuffer
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + i, GL_TEXTURE_2D, FOMGaussianFBOTex[i], 0);
+    }
+    glBindTexture(GL_TEXTURE_2D, 0);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 #pragma endregion
     
@@ -391,6 +442,8 @@ int main()
             if (ImGui::Button("ESM")) occlusionMethod = 1;
             ImGui::SameLine();
             if (ImGui::Button("BSM")) occlusionMethod = 2;
+            ImGui::SameLine();
+            if (ImGui::Button("FOM")) occlusionMethod = 3;
 
             //ImGui::SliderFloat("Light distance", &lightPosScaleRate, 0.3f, 1.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
             ImGui::SliderFloat("Camera speed", &(camera.MovementSpeed), 0.1f, 1000.0f);
@@ -398,8 +451,8 @@ int main()
             ImGui::SliderFloat("Blue noise rate", &blueNoiseRate, 0.0f, 50.0f);
             ImGui::SliderFloat("Low sample number", &lowSampleNum, 0.0f, 3 * 512.0f);
             ImGui::SliderFloat("High sample number", &highSampleNum, 0.0f, 3 * 1024.0f);
-            ImGui::SliderFloat("Debug value", &debugValue, 0.0f, 100.0f);
-            ImGui::SliderInt("Debug value int", &debugValueInt, 0, 30);
+            ImGui::SliderFloat("Debug value", &debugValue, 0.0f, 0.1f);
+            ImGui::SliderInt("Debug value int", &debugValueInt, 1, 100);
             ImGui::ColorEdit3("clear color", (float*)&clear_color);
             ImGui::Text("Cloud render time %f ms/frame", cloudRenderTime);
             ImGui::Text("Shadow map generate time %f ms/frame", shadowmapTime);
@@ -625,8 +678,8 @@ int main()
             glBindFramebuffer(GL_FRAMEBUFFER, BSMGaussianFBO);
             BSMFilteringShader.use();
             BSMFilteringShader.setUniformBool("gaussianDir", false);
-            BSMFilteringShader.setUniform1i("kernelRadius", 6);
-            BSMFilteringShader.setUniform1f("sigma", 18);
+            BSMFilteringShader.setUniform1i("kernelRadius", 10);
+            BSMFilteringShader.setUniform1f("sigma", 8);
 
             BSMFilteringShader.setUniform1i("fbo", 0);
             glActiveTexture(GL_TEXTURE0);
@@ -639,8 +692,8 @@ int main()
             glBindFramebuffer(GL_FRAMEBUFFER, BSMfbo);
             BSMFilteringShader.use();
             BSMFilteringShader.setUniformBool("gaussianDir", true);
-            BSMFilteringShader.setUniform1i("kernelRadius", 6);
-            BSMFilteringShader.setUniform1f("sigma", 18);
+            BSMFilteringShader.setUniform1i("kernelRadius", 10);
+            BSMFilteringShader.setUniform1f("sigma", 8);
 
             BSMFilteringShader.setUniform1i("fbo", 0);
             glActiveTexture(GL_TEXTURE0);
@@ -704,6 +757,140 @@ int main()
             glBindTexture(GL_TEXTURE_2D, blueNoiseTex);
             glActiveTexture(GL_TEXTURE5);
             glBindTexture(GL_TEXTURE_2D, BSMfbotex);
+
+            glBindVertexArray(VAO);
+            glDrawArrays(GL_TRIANGLES, 0, 3);
+            glBindVertexArray(0);
+        }
+
+        if (occlusionMethod == 3)
+        {
+            glFinish();
+            cloudRenderStart = glfwGetTime();
+
+            glFinish();
+            shadowmapStart = glfwGetTime();
+            glViewport(0, 0, SHADOWMAP_WIDTH, SHADOWMAP_HEIGHT);
+            glBindFramebuffer(GL_FRAMEBUFFER, FOMfbo);
+            FOMShader.use();
+            FOMShader.setUniform1f("time", timePassed);
+            FOMShader.setUniform1f("extinction", extinction);
+            FOMShader.setUniform2f("resolution", glm::vec2((float)SHADOWMAP_WIDTH, (float)SHADOWMAP_HEIGHT));
+            FOMShader.setUniform3f("sunDirection", sunPos);
+            FOMShader.setUniformMatrix("invView", glm::inverse(sunView));
+            FOMShader.setUniformMatrix("invProj", glm::inverse(sunProjection));
+
+            FOMShader.setUniform1i("perlworl", 0);
+            FOMShader.setUniform1i("worl", 1);
+            FOMShader.setUniform1i("curl", 2);
+            FOMShader.setUniform1i("weather", 3);
+            FOMShader.setUniform1i("blueNoise", 4);
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_3D, perlworltex);
+            glActiveTexture(GL_TEXTURE1);
+            glBindTexture(GL_TEXTURE_3D, worltex);
+            glActiveTexture(GL_TEXTURE2);
+            glBindTexture(GL_TEXTURE_2D, curltex);
+            glActiveTexture(GL_TEXTURE3);
+            glBindTexture(GL_TEXTURE_2D, weathertex);
+            glActiveTexture(GL_TEXTURE4);
+            glBindTexture(GL_TEXTURE_2D, blueNoiseTex);
+
+            glBindVertexArray(VAO);
+            glDrawArrays(GL_TRIANGLES, 0, 3);
+            glBindVertexArray(0);
+
+            glBindFramebuffer(GL_FRAMEBUFFER, FOMGaussianFBO);
+            FOMFilteringShader.use();
+            FOMFilteringShader.setUniformBool("gaussianDir", false);
+            FOMFilteringShader.setUniform1i("kernelRadius", 10);
+            FOMFilteringShader.setUniform1f("sigma", 8);
+
+            FOMFilteringShader.setUniform1i("fbo0", 0);
+            FOMFilteringShader.setUniform1i("fbo1", 1);
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, FOMfbotex[0]);
+            glActiveTexture(GL_TEXTURE1);
+            glBindTexture(GL_TEXTURE_2D, FOMfbotex[1]);
+
+            glBindVertexArray(VAO);
+            glDrawArrays(GL_TRIANGLES, 0, 3);
+            glBindVertexArray(0);
+
+            glBindFramebuffer(GL_FRAMEBUFFER, FOMfbo);
+            FOMFilteringShader.use();
+            FOMFilteringShader.setUniformBool("gaussianDir", true);
+            FOMFilteringShader.setUniform1i("kernelRadius", 10);
+            FOMFilteringShader.setUniform1f("sigma", 8);
+
+            FOMFilteringShader.setUniform1i("fbo0", 0);
+            FOMFilteringShader.setUniform1i("fbo1", 1);
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, FOMGaussianFBOTex[0]);
+            glActiveTexture(GL_TEXTURE1);
+            glBindTexture(GL_TEXTURE_2D, FOMGaussianFBOTex[1]);
+
+            glBindVertexArray(VAO);
+            glDrawArrays(GL_TRIANGLES, 0, 3);
+            glBindVertexArray(0);
+
+            glFinish();
+            shadowmapSum += (glfwGetTime() - shadowmapStart) * 1000;
+            shadowmapConter++;
+            if (shadowmapConter % 60 == 0)
+            {
+                shadowmapTime = shadowmapSum / 60;
+                shadowmapSum = 0;
+            }
+
+
+            // Write to quarter scaled buffer (1/4 * 1/4 = 1/16 scaled)
+            glBindFramebuffer(GL_FRAMEBUFFER, subbuffer);  // bind fbo, the draw texture is 
+            glViewport(0, 0, WIDTH / downscale, HEIGHT / downscale);  // now the downscale is 4, 1/16 scaled image
+            glDepthMask(GL_FALSE);
+            skyShaderFOM.use();
+            skyShaderFOM.setUniform1i("check", check % downscalesq);
+            skyShaderFOM.setUniform1i("debugValueInt", debugValueInt);
+            skyShaderFOM.setUniform1f("time", timePassed);
+            skyShaderFOM.setUniform1f("aspect", ASPECT);
+            skyShaderFOM.setUniform1f("downscale", (float)downscale);
+            skyShaderFOM.setUniform1f("blueNoiseRate", blueNoiseRate);
+            skyShaderFOM.setUniform1f("debugValue", debugValue);
+            skyShaderFOM.setUniform1f("lowSampleNum", lowSampleNum);
+            skyShaderFOM.setUniform1f("highSampleNum", highSampleNum);
+            skyShaderFOM.setUniform1f("extinction", extinction);
+            skyShaderFOM.setUniform2f("resolution", glm::vec2((float)WIDTH, (float)HEIGHT));
+            skyShaderFOM.setUniform3f("cameraPos", camera.Position);
+            skyShaderFOM.setUniform3f("sunDirection", sunPos);
+            skyShaderFOM.setUniformMatrix("sunView", sunView);
+            skyShaderFOM.setUniformMatrix("sunProj", sunProjection);
+            skyShaderFOM.setUniformMatrix("MVPM", MVPM);
+            skyShaderFOM.setUniformMatrix("invMVPM", invMVPM);
+            skyShaderFOM.setUniformMatrix("invView", glm::inverse(view));
+            skyShaderFOM.setUniformMatrix("invProj", glm::inverse(projection));
+
+            // set textures (weather + noise)
+            skyShaderFOM.setUniform1i("perlworl", 0);
+            skyShaderFOM.setUniform1i("worl", 1);
+            skyShaderFOM.setUniform1i("curl", 2);
+            skyShaderFOM.setUniform1i("weather", 3);
+            skyShaderFOM.setUniform1i("blueNoise", 4);
+            skyShaderFOM.setUniform1i("FOM0", 5);
+            skyShaderFOM.setUniform1i("FOM1", 6);
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_3D, perlworltex);
+            glActiveTexture(GL_TEXTURE1);
+            glBindTexture(GL_TEXTURE_3D, worltex);
+            glActiveTexture(GL_TEXTURE2);
+            glBindTexture(GL_TEXTURE_2D, curltex);
+            glActiveTexture(GL_TEXTURE3);
+            glBindTexture(GL_TEXTURE_2D, weathertex);
+            glActiveTexture(GL_TEXTURE4);
+            glBindTexture(GL_TEXTURE_2D, blueNoiseTex);
+            glActiveTexture(GL_TEXTURE5);
+            glBindTexture(GL_TEXTURE_2D, FOMfbotex[0]);
+            glActiveTexture(GL_TEXTURE6);
+            glBindTexture(GL_TEXTURE_2D, FOMfbotex[1]);
 
             glBindVertexArray(VAO);
             glDrawArrays(GL_TRIANGLES, 0, 3);

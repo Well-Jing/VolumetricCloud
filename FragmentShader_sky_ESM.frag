@@ -357,7 +357,7 @@ float density(vec3 p, vec3 weather, const bool hq, const float LOD)
 {
 	float heightFraction = GetHeightFractionForPoint(length(p)); // the p should be used before times time, otherwise, the p will become much higher than the sky top, there is no cloud
 	p.z += time * 0;
-	vec4 lowNoise = textureLod(perlworl, p * 0.0003, LOD);  //textureLod and texture function are similar, I still do not understand the difference
+	vec4 lowNoise = textureLod(perlworl, p * 0.00035, LOD);  //textureLod and texture function are similar, I still do not understand the difference
 	float fbm = lowNoise.g*0.625 + lowNoise.b*0.25 + lowNoise.a*0.125;
 	//float g = densityHeightGradient(height_fraction, 0.5);  // why the cloud type is only one type ??? why do not use the weather map?
 	float gradient = densityHeightGradient(heightFraction, clamp(pow(weather.b, 1.8), 0, 1));
@@ -370,7 +370,7 @@ float density(vec3 p, vec3 weather, const bool hq, const float LOD)
 	{
 		//vec2 whisp = texture(curl, p.xy * 0.0003).xy;
 		//p.xy += whisp * 400.0 * (1.0 - heightFraction);
-		vec3 highNoise = texture(worl, p * 0.001, LOD - 2.0).xyz; // origianl speed 0.004
+		vec3 highNoise = texture(worl, p * 0.00011, LOD - 2.0).xyz; // origianl speed 0.004
 		float hfbm = highNoise.r*0.625 + highNoise.g*0.25 + highNoise.b*0.125;
 		hfbm = mix(hfbm, 1.0 - hfbm, clamp(heightFraction * 3.0, 0.0, 1.0));
 		base_cloud = remap(base_cloud, hfbm * 0.2, 1.0, 0.0, 1.0);
@@ -388,10 +388,10 @@ float getLight(vec3 p, float maxDist, float extinction)
 	vec4 pSunViewNDC = sunProj * sunView * vec4(secondRayPosESM, 1.0);
 	vec3 pSunProj = pSunViewNDC.xyz / pSunViewNDC.w;
 	vec2 shadowMapCoords = (pSunProj.xy / 2) + 0.5;
-	if (shadowMapCoords.x > 1 || shadowMapCoords.x < 0 || shadowMapCoords.y > 1 || shadowMapCoords.y < 0 || pSunView.z > 0 || pDistance > 15000) return 0.5; 
 	float shadowMapOpticalDistance = texture(ESM, shadowMapCoords).x;
 	float beers = clamp(shadowMapOpticalDistance * expDist, 0, 1);
 
+	if (shadowMapCoords.x > 1 || shadowMapCoords.x < 0 || shadowMapCoords.y > 1 || shadowMapCoords.y < 0 || pSunView.z > 0 || pDistance > 15000) return 0.5; 
 	return beers;
 }
 
@@ -409,7 +409,7 @@ vec4 march(const vec3 pos, const vec3 end, vec3 dir, const int numSamples)
 	float costheta = dot(normalize(secondRayDir), normalize(dir)); // the angle between view ray (first) and light ray (secondary)
 	float phase = max(HG(costheta, 0.6), 1.4 * HG(costheta, 0.99 - 0.4)); // this is from Nubis 2017 siggraph course
 	phase = mix(phase, HG(costheta, -0.5), 0.3); // when look along the sun light direction (from Frostbite 2016 talk)
-	const float weatherScale = 0.00005; // original 0.00008 // 0.00005 is beautiful!!!
+	const float weatherScale = 0.00006; // original 0.00008 // 0.00005 is beautiful!!!
 
 	int counter = 0;
 
@@ -434,7 +434,7 @@ vec4 march(const vec3 pos, const vec3 end, vec3 dir, const int numSamples)
 		}
 	}
 
-	if ((counter > 0 && counter < 10 && totalTrans > 0.6) || (counter > 0 && alpha < 0.05)) return vec4(L, pow(0.2, max(6 - counter, counter)));
+	//if ((counter > 0 && counter < 10 && totalTrans > 0.6) || (counter > 0 && alpha < 0.05)) return vec4(L, pow(0.2, max(6 - counter, counter)));
 	return vec4(L, alpha);
 }
 

@@ -84,6 +84,12 @@
     <None Include="FragmentShader_BSM.frag" />
     <None Include="FragmentShader_gaussianBSM.frag" />
     <None Include="FragmentShader_sky_BSM.frag" />
+    <None Include="FragmentShader_FOM.frag" />
+    <None Include="FragmentShader_gaussianFOM.frag" />
+    <None Include="FragmentShader_sky_FOM.frag" />
+    <None Include="VertexShader_FOM.vert" />
+    <None Include="VertexShader_gaussianFOM.vert" />
+    <None Include="VertexShader_sky_FOM.vert" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Camera.h">

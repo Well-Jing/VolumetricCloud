@@ -56,7 +56,7 @@ float density(vec3 p, vec3 weather, const bool hq, const float LOD)
 {
 	float heightFraction = GetHeightFractionForPoint(length(p)); // the p should be used before times time, otherwise, after a long time, the p will become much higher than the sky top, there is no cloud
 	p.z += time * 0;
-	vec4 lowNoise = textureLod(perlworl, p * 0.0003, LOD);  //textureLod and texture function are similar, I still do not understand the difference
+	vec4 lowNoise = textureLod(perlworl, p * 0.00035, LOD);  //textureLod and texture function are similar, I still do not understand the difference
 	float fbm = lowNoise.g*0.625 + lowNoise.b*0.25 + lowNoise.a*0.125;
 	float base_cloud = remap(lowNoise.r, -(1.0 - fbm), 1.0, 0.0, 1.0);
 	float gradient = densityHeightGradient(heightFraction, clamp(pow(weather.b, 1.8), 0, 1));
@@ -68,7 +68,7 @@ float density(vec3 p, vec3 weather, const bool hq, const float LOD)
 	{
 		//vec2 whisp = texture(curl, p.xy * 0.0003).xy;
 		//p.xy += whisp * 400.0 * (1.0 - heightFraction);
-		vec3 highNoise = texture(worl, p * 0.001, LOD - 2.0).xyz; // origianl speed 0.004
+		vec3 highNoise = texture(worl, p * 0.00011, LOD - 2.0).xyz; // origianl speed 0.004
 		float hfbm = highNoise.r*0.625 + highNoise.g*0.25 + highNoise.b*0.125;
 		hfbm = mix(hfbm, 1.0 - hfbm, clamp(heightFraction * 3.0, 0.0, 1.0));
 		base_cloud = remap(base_cloud, hfbm * 0.2, 1.0, 0.0, 1.0);
@@ -82,9 +82,9 @@ vec4 march(vec3 pos, vec3 dir, float stepDist, int numSamples)
 	float totalTrans = 1.0; // total tranparency
 	float depth = 0;
 	const float densityScale = 0.02; // scale the attenuation of cloud
-	const float weatherScale = 0.00005; // original 0.00008
+	const float weatherScale = 0.00006; // original 0.00008
 	const float breakTrans = 0.05; // hardcode value, can be manipulated by the artists
-	float THRESHOLD = 0.02;
+	float THRESHOLD = 0.01;
 
 	float frontDepth = -1;
 	float maxOpticalDepth = 0;
@@ -153,6 +153,7 @@ void main()
 		
 	//vec3 lweather = texture(weather, vec2(0.1f, 0.1f)).xyz;
 	//vec4 volume = march(start + blueNoiseOffset, end, raystep, int(steps));
-	vec4 expDist = march(worldPos + blueNoiseOffset, dir, stepDist, numStep);
+	//vec4 expDist = march(worldPos + blueNoiseOffset, dir, stepDist, numStep);
+	vec4 expDist = march(worldPos, dir, stepDist, numStep);
 	color = expDist;
 } 

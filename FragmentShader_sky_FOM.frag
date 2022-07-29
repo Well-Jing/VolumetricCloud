@@ -380,19 +380,19 @@ float density(vec3 p, vec3 weather, const bool hq, const float LOD)
 	return clamp(base_cloud, 0.0, 1.0);
 }
 
-float getLight(vec3 p)
+float getLight(vec3 p, vec3 viewDir, vec3 secondRayDir)
 {
 	vec3 secondRayPosFOM = p - vec3(0.0, g_radius, 0.0); // the baseground has 200000 height, we should subtract it ( too large value may cause precision problem)
 	vec4 pSunView = sunView * vec4(secondRayPosFOM, 1.0);
 	float pDistance = -pSunView.z; // view space look into negative z
-	float d = pDistance / 15000; // 15000 from the ESM (the maximam trace distance)
+	float d = pDistance / 14999; // 15000 from the ESM (the maximam trace distance)
 	vec4 pSunViewNDC = sunProj * sunView * vec4(secondRayPosFOM, 1.0);
 	vec3 pSunProj = pSunViewNDC.xyz / pSunViewNDC.w;
 	vec2 shadowMapCoords = (pSunProj.xy / 2) + 0.5;
 	vec4 a = texture(FOM0, shadowMapCoords);
 	vec3 b = texture(FOM1, shadowMapCoords).rgb;
 
-	float integral = a.r / 2 * d + 
+	float opticalDist = a.r / 2 * d + 
 					 a.g / (2 * M_PI) * sin(2 * M_PI * d) + 
 					 a.b / (2 * M_PI * 2) * sin(2 * M_PI * 2 * d) + 
 					 a.a / (2 * M_PI * 3) * sin(2 * M_PI * 3 * d) +
@@ -400,7 +400,9 @@ float getLight(vec3 p)
 					 b.g / (2 * M_PI * 2) * (1 - cos(2 * M_PI * 2 * d)) + 
 					 b.b / (2 * M_PI * 3) * (1 - cos(2 * M_PI * 3 * d));
 
-	float beers = clamp(exp(-integral), 0, 1);
+	float beers = clamp(exp(-opticalDist), 0, 1);
+	float powder = 1.0 - exp(-opticalDist * 2);
+	float beersPowder = mix(beers, 2 * beers * powder, pow(clamp(-dot(normalize(viewDir), normalize(secondRayDir)), 0, 1), 1));
 
 	if (shadowMapCoords.x > 1 || shadowMapCoords.x < 0 || shadowMapCoords.y > 1 || shadowMapCoords.y < 0 || pSunView.z > 0 || pDistance > 15000) return 0.5; 
 	return beers;
@@ -429,18 +431,18 @@ vec4 march(const vec3 pos, const vec3 end, vec3 dir, const int numSamples)
 		if (totalTrans < 0.001) break; // I do not know why, but if I use break or put it into for loop condition, artefact shows up
 		p += dir; // move forward
 		vec3 weatherSample = texture(weather, p.xz * weatherScale).xyz; // get weather information
-		float viewRayDensity = density(p, weatherSample, true, 0.0); // compute density
-		float transmitance = exp(-densityScale * viewRayDensity * stepDistance); 
+		float viewRayDensity = densityScale * density(p, weatherSample, true, 0.0); // compute density
+		float transmitance = exp(-viewRayDensity * stepDistance); 
 		totalTrans *= transmitance;	
 
 		if (viewRayDensity > 0.0)  //calculate lighting, but only when we are in a non-zero density point (when there is cloud)
 		{ 
 			counter++;
-			float beers = getLight(p);	
+			float beers = getLight(p, dir, secondRayDir);	
 			float heightFraction = GetHeightFractionForPoint(p.y);
-			vec3 ambient = 5.0 * vAmbient * mix(0.15, 1.0, heightFraction);
+			vec3 ambient = 15.0 * vAmbient * mix(0.15, 1.0, heightFraction);
 			vec3 sunC = pow(vSunColor, vec3(0.75)); // sun color
-			L += (ambient + sunC * beers * phase) * viewRayDensity * totalTrans * stepDistance;		// (did you counter the out-scattering rate?)																		// (should we multiple totalTrans again?)
+			L += (ambient + 5 * sunC * beers * phase) * viewRayDensity * totalTrans * stepDistance;		// (did you counter the out-scattering rate?)																		// (should we multiple totalTrans again?)
 			alpha += (1.0 - transmitance) * (1.0 - alpha);  // this is from Horizon zero dawn talk
 		}
 	}

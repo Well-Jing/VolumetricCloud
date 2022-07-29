@@ -451,7 +451,7 @@ int main()
             ImGui::SliderFloat("Blue noise rate", &blueNoiseRate, 0.0f, 50.0f);
             ImGui::SliderFloat("Low sample number", &lowSampleNum, 0.0f, 3 * 512.0f);
             ImGui::SliderFloat("High sample number", &highSampleNum, 0.0f, 3 * 1024.0f);
-            ImGui::SliderFloat("Debug value", &debugValue, 0.0f, 0.1f);
+            ImGui::SliderFloat("Debug value", &debugValue, 0.0f, 1.0f);
             ImGui::SliderInt("Debug value int", &debugValueInt, 1, 100);
             ImGui::ColorEdit3("clear color", (float*)&clear_color);
             ImGui::Text("Cloud render time %f ms/frame", cloudRenderTime);

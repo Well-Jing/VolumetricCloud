@@ -394,7 +394,7 @@ float getLight(vec3 p, vec3 secondRayDir, vec3 viewDir, float weatherScale, floa
 		//secondRayPos += secondRayDir;
 		vec3 secondRayWeather = texture(weather, secondRayPos.xz * weatherScale).xyz;
 		//densitySum += density(secondRayPos, secondRayWeather, false, float(j));
-		densitySum += density(secondRayPos, secondRayWeather, false, float(j)) * (j+1) * length(secondRayDir);
+		densitySum += densityScale * density(secondRayPos, secondRayWeather, false, float(j)) * (j+1) * length(secondRayDir);
 		//float tempDensity = density(secondRayPos, secondRayWeather, false, float(j));
 		//beers *= max(exp(-densityScale * tempDensity * length(secondRayDir)), 
 		//				exp(-densityScale * tempDensity * length(secondRayDir) * 0.25 ) * 0.7);
@@ -403,14 +403,13 @@ float getLight(vec3 p, vec3 secondRayDir, vec3 viewDir, float weatherScale, floa
 
 	densitySum /= length(secondRayDir);
 
-	float heightFraction = GetHeightFractionForPoint(p.y);
-	vec3 ambient = 5.0 * vAmbient * mix(0.15, 1.0, heightFraction);
-	float beers = max(exp(-densityScale * densitySum * length(secondRayDir)), 
-						exp(-densityScale * densitySum * length(secondRayDir) * 0.25 ) * 0.7);  // this is from Nubis 2017 siggraph course
-	float powder = 1.0 - exp(-densityScale * densitySum * length(secondRayDir) * 2);
+	float beers = max(exp(-densitySum * length(secondRayDir)), 
+						exp(-densitySum * length(secondRayDir) * 0.25 ) * 0.7);  // this is from Nubis 2017 siggraph course
+	float powder = 1.0 - exp(-densitySum * length(secondRayDir) * 2);
 	//float powder = 1.0 - exp(-densityScale / debugValue * densitySum * length(secondRayDir));
 	//powder = 1 - beers*beers;
-	float beersPowder = mix(mix(beers, 2 * beers * powder, pow(clamp(-dot(normalize(viewDir), normalize(secondRayDir)), 0, 1), 1)), beers, debugValue); // here times 2.0 to approximate a good effect (check GPU Pro 360 Guide to lighting)
+	//float beersPowder = mix(mix(beers, 2 * beers * powder, pow(clamp(-dot(normalize(viewDir), normalize(secondRayDir)), 0, 1), 1)), beers, debugValue); // here times 2.0 to approximate a good effect (check GPU Pro 360 Guide to lighting)
+	float beersPowder = mix(beers, 2 * beers * powder, pow(clamp(-dot(normalize(viewDir), normalize(secondRayDir)), 0, 1), 1));
 	//float beersPowder = powder; // here times 2.0 to approximate a good effect (check GPU Pro 360 Guide to lighting)
 	//float beersPowder2 = mix(beers, powder, debugValue); // we can add powder effect in the future
 	//return beersPowder2;
@@ -432,7 +431,7 @@ vec4 march(const vec3 pos, const vec3 end, vec3 dir, const int numSamples)
 	vec3 secondRayDir = vSunDirection * stepDistance;          // direction towards sun? I think this is inverse, but when added -, the result looks strange
 	vec3 L = vec3(0.0f); 
 	//const float densityScale = 0.15; // scale the attenuation of cloud
-	const float densityScale = 0.2; // scale the attenuation of cloud
+	float densityScale = 0.15; // scale the attenuation of cloud 0.2
 	float costheta = dot(normalize(secondRayDir), normalize(dir)); // the angle between view ray (first) and light ray (secondary)
 	float phase = max(HG(costheta, 0.6), 1.4 * HG(costheta, 0.99 - 0.4)); // this is from Nubis 2017 siggraph course
 	phase = mix(phase, HG(costheta, -0.5), 0.3); // when look along the sun light direction (from Frostbite 2016 talk)
@@ -446,8 +445,8 @@ vec4 march(const vec3 pos, const vec3 end, vec3 dir, const int numSamples)
 		if (totalTrans < 0.001) break; // I do not know why, but if I use break or put it into for loop condition, artefact shows up
 		p += dir; // move forward
 		vec3 weatherSample = texture(weather, p.xz * weatherScale).xyz; // get weather information
-		float viewRayDensity = density(p, weatherSample, true, 0.0); // compute density
-		float transmitance = exp(-densityScale * viewRayDensity * stepDistance); 
+		float viewRayDensity = densityScale * density(p, weatherSample, true, 0.0); // compute density
+		float transmitance = exp(-viewRayDensity * stepDistance); 
 		totalTrans *= transmitance;	
 
 		if (viewRayDensity > 0.0)  //calculate lighting, but only when we are in a non-zero density point (when there is cloud)
@@ -455,14 +454,15 @@ vec4 march(const vec3 pos, const vec3 end, vec3 dir, const int numSamples)
 			counter++;
 			float beers = getLight(p, secondRayDir, dir, weatherScale, densityScale);
 			float heightFraction = GetHeightFractionForPoint(p.y);
-			vec3 ambient = 5.0 * vAmbient * mix(0.15, 1.0, heightFraction);
+			vec3 ambient = 15.0 * vAmbient * mix(0.15, 1.0, heightFraction);
 			vec3 sunC = pow(vSunColor, vec3(0.75)); // sun color
-			L += (ambient + sunC * beers * phase) * viewRayDensity * totalTrans * stepDistance;		// (did you counter the out-scattering rate?)
+			L += (ambient + 5 * sunC * beers * phase) * viewRayDensity * totalTrans * stepDistance;		// (did you counter the out-scattering rate?)
 			alpha += (1.0 - transmitance) * (1.0 - alpha); // this is from Horizon zero dawn talk
 		}
 	}
 
 	//if ((counter > 0 && counter < 10 && totalTrans > 0.6) || (counter > 0 && alpha < 0.05)) return vec4(L, pow(0.2, max(6 - counter, counter)));
+	//if (alpha > 0 && alpha < 0.3) alpha = 1;
 	return vec4(L, alpha);
 }
 
@@ -514,6 +514,7 @@ void main()
 		vec4 volume = march(start + blueNoiseOffset, end, raystep, int(steps)); // ray-marching
 		testVolume = volume;
 		volume.xyz = U2Tone(volume.xyz)*cwhiteScale;                            // HDR Tone mapping
+		//volume.xyz = volume.xyz / (volume.xyz + vec3(1.0));
 		volume.xyz = sqrt(volume.xyz);
 		vec3 background = vec3(1.0);
 		background = preetham(dir);
@@ -535,4 +536,3 @@ void main()
 	//color = testVolume;
 	color = col;
 }
-

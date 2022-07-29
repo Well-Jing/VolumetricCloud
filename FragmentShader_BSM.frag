@@ -81,10 +81,10 @@ vec4 march(vec3 pos, vec3 dir, float stepDist, int numSamples)
 	vec3 p = pos;           // sample position
 	float totalTrans = 1.0; // total tranparency
 	float depth = 0;
-	const float densityScale = 0.02; // scale the attenuation of cloud
+	const float densityScale = 0.025; // scale the attenuation of cloud // this value is not match the sky shader, but large value leads to problem
 	const float weatherScale = 0.00006; // original 0.00008
 	const float breakTrans = 0.05; // hardcode value, can be manipulated by the artists
-	float THRESHOLD = 0.01;
+	float THRESHOLD = 0.001;
 
 	float frontDepth = -1;
 	float maxOpticalDepth = 0;
@@ -97,19 +97,19 @@ vec4 march(vec3 pos, vec3 dir, float stepDist, int numSamples)
 		p += dir * stepDist; // move forward
 		depth += stepDist;
 		vec3 weatherSample = texture(weather, p.xz * weatherScale).xyz; // get weather information
-		float viewRayDensity = density(p, weatherSample, false, 0.0); // compute density
+		float viewRayDensity = densityScale * density(p, weatherSample, false, 0.0); // compute density
 
 		if(viewRayDensity > THRESHOLD)
 		{
 			if (frontDepth < 0)	frontDepth = depth;
 
-			extinctionAccumulator += densityScale * viewRayDensity;
-			maxOpticalDepth += densityScale * viewRayDensity * stepDist;
+			extinctionAccumulator += viewRayDensity;
+			maxOpticalDepth += viewRayDensity * stepDist;
 			
 			sampleCounter++;
 		}
 
-		float transmitance = exp(-densityScale * viewRayDensity * stepDist); 
+		float transmitance = exp(-viewRayDensity * stepDist); 
 		totalTrans *= transmitance;	
 
 		if (totalTrans < breakTrans) break; 

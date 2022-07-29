@@ -91,8 +91,8 @@ vec4 march(vec3 pos, vec3 dir, float stepDist, int numSamples)
 	{
 		p += dir * stepDist; // move forward
 		vec3 weatherSample = texture(weather, p.xz * weatherScale).xyz; // get weather information
-		float viewRayDensity = density(p, weatherSample, false, 0.0); // compute density
-		float transmitance = exp(-densityScale * viewRayDensity * stepDist); 
+		float viewRayDensity = densityScale * density(p, weatherSample, false, 0.0); // compute density
+		float transmitance = exp(-viewRayDensity * stepDist); 
 		totalTrans *= transmitance;	
 		depth += stepDist;
 

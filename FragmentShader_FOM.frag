@@ -87,7 +87,7 @@ FourierCoefficients march(vec3 pos, vec3 dir, float stepDist, int numSamples)
 	vec3 p = pos;           // sample position
 	float totalTrans = 1.0; // total tranparency
 	float depth = 0;
-	const float densityScale = 0.02; // scale the attenuation of cloud
+	const float densityScale = 3; // scale the attenuation of cloud  // this also do not match the sky shader but small values do not work
 	const float weatherScale = 0.00006; // original 0.00008
 	const float breakTrans = 0.05; // hardcode value, can be manipulated by the artists
 	float THRESHOLD = 0.01;
@@ -100,7 +100,7 @@ FourierCoefficients march(vec3 pos, vec3 dir, float stepDist, int numSamples)
 		p += dir * stepDist; // move forward
 		depth += stepDist;
 		vec3 weatherSample = texture(weather, p.xz * weatherScale).xyz; // get weather information
-		float viewRayDensity = 3 * density(p, weatherSample, false, 0.0); // compute density
+		float viewRayDensity = densityScale * density(p, weatherSample, false, 0.0); // compute density
 		float d = depth / (stepDist * numSamples);
 
 		a0 += -2 * log(1 - viewRayDensity);
@@ -116,33 +116,6 @@ FourierCoefficients march(vec3 pos, vec3 dir, float stepDist, int numSamples)
 	return FourierCoefficients(a0, a1, a2, a3, b1, b2, b3);
 }
 
-vec4 marchB(vec3 pos, vec3 dir, float stepDist, int numSamples) 
-{
-	vec3 p = pos;           // sample position
-	float totalTrans = 1.0; // total tranparency
-	float depth = 0;
-	const float densityScale = 0.02; // scale the attenuation of cloud
-	const float weatherScale = 0.00006; // original 0.00008
-	const float breakTrans = 0.05; // hardcode value, can be manipulated by the artists
-	float THRESHOLD = 0.01;
-
-	float b1 = 0, b2 = 0, b3 = 0;
-
-	for (int i = 0; i < numSamples; i++) // sample points until the max number
-	{
-		p += dir * stepDist; // move forward
-		depth += stepDist;
-		vec3 weatherSample = texture(weather, p.xz * weatherScale).xyz; // get weather information
-		float viewRayDensity = density(p, weatherSample, false, 0.0); // compute density
-
-		b1 += -2 * log(1 - viewRayDensity) * sin(2 * M_PI * 1 * depth);
-		b2 += -2 * log(1 - viewRayDensity) * sin(2 * M_PI * 2 * depth);
-		b3 += -2 * log(1 - viewRayDensity) * sin(2 * M_PI * 3 * depth);
-	}
-
-	return vec4(b1, b2, b3, 0);
-}
-
 void main()
 {             
     vec2 uv = gl_FragCoord.xy / resolution;
@@ -156,7 +129,7 @@ void main()
 	float extinction = 2;
 	float numStep = 100;
 	//float stepDist = 15000 / numStep;
-	float stepDist = 15000 / numStep;
+	float stepDist = 14999 / numStep;
 	//vec4 expDist = exp(extinction * march(worldPos, dir, stepDist, numStep));
 
 	float blueNoiseRate = 20;
@@ -164,7 +137,6 @@ void main()
 	vec3 blueNoiseOffset = fract(blueNoise + float(0 * 100) * c_goldenRatioConjugate) * dir * blueNoiseRate;  // use blue noise
 		
 	FourierCoefficients results = march(worldPos, dir, stepDist, int(numStep));
-	//vec4 b = marchB(worldPos, dir, stepDist, int(numStep));
 
 	FOMtex0 = vec4(results.a0, results.a1, results.a2, results.a3);
 	FOMtex1 = vec4(results.b1, results.b2, results.b3, 0);

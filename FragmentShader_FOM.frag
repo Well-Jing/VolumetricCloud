@@ -127,7 +127,7 @@ void main()
 	vec3 dir = -normalize(sunDirection);
 
 	float extinction = 2;
-	float numStep = 100;
+	float numStep = 100;  // default is 100
 	//float stepDist = 15000 / numStep;
 	float stepDist = 14999 / numStep;
 	//vec4 expDist = exp(extinction * march(worldPos, dir, stepDist, numStep));

@@ -257,12 +257,14 @@ vec3 preetham(const vec3 vWorldPosition)
 
 	vec3 texColor = ( Lin + L0 ) * 0.04 + vec3( 0.0, 0.0003, 0.00075 );
 
-	vec3 curr = U2Tone( texColor );
-	vec3 color = curr * whiteScale;
+	return texColor;
 
-	vec3 retColor = pow( color, vec3( 1.0 / ( 1.2 + ( 1.2 * vSunfade ) ) ) );
-
-	return retColor;
+	//vec3 curr = U2Tone( texColor );
+	//vec3 color = curr * whiteScale;
+	//
+	//vec3 retColor = pow( color, vec3( 1.0 / ( 1.2 + ( 1.2 * vSunfade ) ) ) );
+	//
+	//return retColor;
 }
 /*
 	 ===============================================================
@@ -488,13 +490,12 @@ void main()
 		
 		//vec3 lweather = texture(weather, vec2(0.1f, 0.1f)).xyz;
 		vec4 volume = march(start + blueNoiseOffset, end, raystep, int(steps)); // ray-marching
-		testVolume = volume;
-		volume.xyz = U2Tone(volume.xyz)*cwhiteScale;                            // HDR Tone mapping
+		vec3 background = preetham(dir);
+		volume.xyz += background * (1.0 - volume.a);
+		volume.xyz = U2Tone(volume.xyz)*cwhiteScale;
 		volume.xyz = sqrt(volume.xyz);
-		vec3 background = vec3(1.0);
-		background = preetham(dir);
-		col = vec4(background * (1.0 - volume.a) + volume.xyz * volume.a, 1.0);
-		//col = vec4(vec3(pow(background.x * (1.0 - volume.a) + volume.x * volume.a, 15)), 1.0);
+		col = volume;
+
 		if (volume.a > 1.0) 
 		{
 			col = vec4(1.0, 0.0, 0.0, 1.0); // output error area
@@ -503,10 +504,10 @@ void main()
 	// if it is lower than horizon, all grey
 	else 
 	{
-		vec3 background = vec3(0.5);
-		background = preetham(dir);
+		vec3 background = preetham(dir);
+		background = U2Tone(background)*cwhiteScale;
+		background = sqrt(background);
 		col = vec4(background, 1.0);
-		testVolume = col;
 	}
 	//color = testVolume;
 	color = col;

@@ -452,7 +452,7 @@ int main()
             ImGui::SliderFloat("Low sample number", &lowSampleNum, 0.0f, 3 * 512.0f);
             ImGui::SliderFloat("High sample number", &highSampleNum, 0.0f, 3 * 1024.0f);
             ImGui::SliderFloat("Debug value", &debugValue, 0.0f, 1.0f);
-            ImGui::SliderInt("Debug value int", &debugValueInt, 1, 100);
+            ImGui::SliderInt("Debug value int", &debugValueInt, 1, 10);
             ImGui::ColorEdit3("clear color", (float*)&clear_color);
             ImGui::Text("Cloud render time %f ms/frame", cloudRenderTime);
             ImGui::Text("Shadow map generate time %f ms/frame", shadowmapTime);
@@ -578,9 +578,9 @@ int main()
             glFinish();
             shadowmapSum += (glfwGetTime() - shadowmapStart) * 1000;
             shadowmapConter++;
-            if (shadowmapConter % 60 == 0)
+            if (shadowmapConter % 500 == 0)
             {
-                shadowmapTime = shadowmapSum / 60;
+                shadowmapTime = shadowmapSum / 500;
                 shadowmapSum = 0;
             }
             
@@ -706,9 +706,9 @@ int main()
             glFinish();
             shadowmapSum += (glfwGetTime() - shadowmapStart) * 1000;
             shadowmapConter++;
-            if (shadowmapConter % 60 == 0)
+            if (shadowmapConter % 500 == 0)
             {
-                shadowmapTime = shadowmapSum / 60;
+                shadowmapTime = shadowmapSum / 500;
                 shadowmapSum = 0;
             }
 
@@ -837,9 +837,9 @@ int main()
             glFinish();
             shadowmapSum += (glfwGetTime() - shadowmapStart) * 1000;
             shadowmapConter++;
-            if (shadowmapConter % 60 == 0)
+            if (shadowmapConter % 500 == 0)
             {
-                shadowmapTime = shadowmapSum / 60;
+                shadowmapTime = shadowmapSum / 500;
                 shadowmapSum = 0;
             }
 
@@ -952,9 +952,9 @@ int main()
         glFinish();
         cloudRenderSum += (glfwGetTime() - cloudRenderStart) * 1000;
         cloudRenderConter++;
-        if (cloudRenderConter % 60 == 0)
+        if (cloudRenderConter % 500 == 0)
         {
-            cloudRenderTime = cloudRenderSum / 60;
+            cloudRenderTime = cloudRenderSum / 500;
             cloudRenderSum = 0;
         }
 

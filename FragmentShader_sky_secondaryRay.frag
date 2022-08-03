@@ -256,12 +256,14 @@ vec3 preetham(const vec3 vWorldPosition)
 
 	vec3 texColor = ( Lin + L0 ) * 0.04 + vec3( 0.0, 0.0003, 0.00075 );
 
-	vec3 curr = U2Tone( texColor );
-	vec3 color = curr * whiteScale;
+	return texColor;
 
-	vec3 retColor = pow( color, vec3( 1.0 / ( 1.2 + ( 1.2 * vSunfade ) ) ) );
-
-	return retColor;
+	//vec3 curr = U2Tone( texColor );
+	//vec3 color = curr * whiteScale;
+	//
+	//vec3 retColor = pow( color, vec3( 1.0 / ( 1.2 + ( 1.2 * vSunfade ) ) ) );
+	//
+	//return retColor;
 }
 /*
 	 ===============================================================
@@ -482,10 +484,8 @@ void main()
 																			
 	vec4 col = vec4(0.0);
 	vec3 camPos = vec3(0.0, g_radius, 0.0) + cameraPos;                     // camPos is for computing cloud, while cameraPos is the exact position of the game camera
-	vec4 testVolume;
-	// if it is higher than horizon
-	//if (dir.y > 0.0) 
-	//if(1 > 0)
+
+
 	if (dir.y > 0.0 || (camPos.y >= sky_b_radius))
 	{ 
 		//vec3 start = camPos + dir * intersectSphere(camPos, dir, sky_b_radius); // the intersection with the bottom of the cloud layer
@@ -509,17 +509,14 @@ void main()
 		if (camPos.y >= sky_b_radius) raystep = dir * min(stepDistance, 30);
 		float blueNoise = texture(blueNoise, gl_FragCoord.xy / 1024.0f).r;
 		vec3 blueNoiseOffset = fract(blueNoise + float(time * 100) * c_goldenRatioConjugate) * dir * blueNoiseRate;  // use blue noise
-		
-		//vec3 lweather = texture(weather, vec2(0.1f, 0.1f)).xyz;
+				
 		vec4 volume = march(start + blueNoiseOffset, end, raystep, int(steps)); // ray-marching
-		testVolume = volume;
-		volume.xyz = U2Tone(volume.xyz)*cwhiteScale;                            // HDR Tone mapping
-		//volume.xyz = volume.xyz / (volume.xyz + vec3(1.0));
+		vec3 background = preetham(dir);
+		volume.xyz += background * (1.0 - volume.a);
+		volume.xyz = U2Tone(volume.xyz)*cwhiteScale;
 		volume.xyz = sqrt(volume.xyz);
-		vec3 background = vec3(1.0);
-		background = preetham(dir);
-		col = vec4(background * (1.0 - volume.a) + volume.xyz * volume.a, 1.0);
-		//col = vec4(vec3(pow(background.x * (1.0 - volume.a) + volume.x * volume.a, 15)), 1.0);
+		col = volume;
+
 		if (volume.a > 1.0) 
 		{
 			col = vec4(1.0, 0.0, 0.0, 1.0); // output error area
@@ -528,10 +525,10 @@ void main()
 	// if it is lower than horizon, all grey
 	else 
 	{
-		vec3 background = vec3(0.5);
-		background = preetham(dir);
+		vec3 background = preetham(dir);
+		background = U2Tone(background)*cwhiteScale;
+		background = sqrt(background);
 		col = vec4(background, 1.0);
-		testVolume = col;
 	}
 	//color = testVolume;
 	color = col;

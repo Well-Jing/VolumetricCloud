@@ -178,6 +178,7 @@
     <None Include="FragmentShader_sky_FOM.frag" />
     <None Include="FragmentShader_sky_secondaryRay.frag" />
     <None Include="FragmentShader_sky_ESM.frag" />
+    <None Include="FragmentShader_sky_secondaryRayHigh.frag" />
     <None Include="VertexShader_BSM.vert" />
     <None Include="VertexShader_FOM.vert" />
     <None Include="VertexShader_gaussianBSM.vert" />
@@ -190,6 +191,7 @@
     <None Include="VertexShader_postprocess.vert" />
     <None Include="FragmentShader_upscale.frag" />
     <None Include="VertexShader_sky_ESM.vert" />
+    <None Include="VertexShader_sky_secondaryRayHigh.vert" />
     <None Include="VertexShader_upscale.vert" />
     <None Include="VertexShader_blinnPhong.vert" />
   </ItemGroup>

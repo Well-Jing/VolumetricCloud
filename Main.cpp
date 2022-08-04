@@ -109,15 +109,16 @@ int main()
     Shader skyShaderESM("VertexShader_sky_ESM.vert", "FragmentShader_sky_ESM.frag");
     Shader skyShaderBSM("VertexShader_sky_BSM.vert", "FragmentShader_sky_BSM.frag");
     Shader skyShaderFOM("VertexShader_sky_FOM.vert", "FragmentShader_sky_FOM.frag");
-    Shader upscaleShader("VertexShader_upscale.vert", "FragmentShader_upscale.frag");
-    Shader postShader("VertexShader_postprocess.vert", "FragmentShader_postprocess.frag");
-    Shader blinnPhongShader("VertexShader_blinnPhong.vert", "FragmentShader_blinnPhong.frag");
+    Shader skyShaderSecondaryRayMarchingHigh("VertexShader_sky_secondaryRayHigh.vert", "FragmentShader_sky_secondaryRayHigh.frag");
     Shader ESMShader("VertexShader_ESM.vert", "FragmentShader_ESM.frag");
     Shader ESMFilteringShader("VertexShader_gaussianESM.vert", "FragmentShader_gaussianESM.frag");
     Shader BSMShader("VertexShader_BSM.vert", "FragmentShader_BSM.frag");
     Shader BSMFilteringShader("VertexShader_gaussianBSM.vert", "FragmentShader_gaussianBSM.frag");
     Shader FOMShader("VertexShader_FOM.vert", "FragmentShader_FOM.frag");
     Shader FOMFilteringShader("VertexShader_gaussianFOM.vert", "FragmentShader_gaussianFOM.frag");
+    Shader upscaleShader("VertexShader_upscale.vert", "FragmentShader_upscale.frag");
+    Shader postShader("VertexShader_postprocess.vert", "FragmentShader_postprocess.frag");
+    Shader blinnPhongShader("VertexShader_blinnPhong.vert", "FragmentShader_blinnPhong.frag");
 #pragma endregion
 
 #pragma region Light Declaration
@@ -444,6 +445,8 @@ int main()
             if (ImGui::Button("BSM")) occlusionMethod = 2;
             ImGui::SameLine();
             if (ImGui::Button("FOM")) occlusionMethod = 3;
+            ImGui::SameLine();
+            if (ImGui::Button("Second ray high")) occlusionMethod = 4;
 
             //ImGui::SliderFloat("Light distance", &lightPosScaleRate, 0.3f, 1.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
             ImGui::SliderFloat("Camera speed", &(camera.MovementSpeed), 0.1f, 1000.0f);
@@ -891,6 +894,55 @@ int main()
             glBindTexture(GL_TEXTURE_2D, FOMfbotex[0]);
             glActiveTexture(GL_TEXTURE6);
             glBindTexture(GL_TEXTURE_2D, FOMfbotex[1]);
+
+            glBindVertexArray(VAO);
+            glDrawArrays(GL_TRIANGLES, 0, 3);
+            glBindVertexArray(0);
+        }
+
+        if (occlusionMethod == 4)
+        {
+            glFinish();
+            cloudRenderStart = glfwGetTime();
+            glBindFramebuffer(GL_FRAMEBUFFER, subbuffer);  // bind fbo, the draw texture is 
+            glViewport(0, 0, WIDTH / downscale, HEIGHT / downscale);  // now the downscale is 4, 1/16 scaled image
+            glDepthMask(GL_FALSE);
+            skyShaderSecondaryRayMarchingHigh.use();
+            skyShaderSecondaryRayMarchingHigh.setUniform1i("check", check % downscalesq);
+            skyShaderSecondaryRayMarchingHigh.setUniform1i("debugValueInt", debugValueInt);
+            skyShaderSecondaryRayMarchingHigh.setUniform1f("time", timePassed);
+            skyShaderSecondaryRayMarchingHigh.setUniform1f("aspect", ASPECT);
+            skyShaderSecondaryRayMarchingHigh.setUniform1f("downscale", (float)downscale);
+            skyShaderSecondaryRayMarchingHigh.setUniform1f("blueNoiseRate", blueNoiseRate);
+            skyShaderSecondaryRayMarchingHigh.setUniform1f("debugValue", debugValue);
+            skyShaderSecondaryRayMarchingHigh.setUniform1f("lowSampleNum", lowSampleNum);
+            skyShaderSecondaryRayMarchingHigh.setUniform1f("highSampleNum", highSampleNum);
+            skyShaderSecondaryRayMarchingHigh.setUniform2f("resolution", glm::vec2((float)WIDTH, (float)HEIGHT));
+            skyShaderSecondaryRayMarchingHigh.setUniform3f("cameraPos", camera.Position);
+            skyShaderSecondaryRayMarchingHigh.setUniform3f("sunDirection", sunPos);
+            skyShaderSecondaryRayMarchingHigh.setUniformMatrix("sunView", sunView);
+            skyShaderSecondaryRayMarchingHigh.setUniformMatrix("sunProj", sunProjection);
+            skyShaderSecondaryRayMarchingHigh.setUniformMatrix("MVPM", MVPM);
+            skyShaderSecondaryRayMarchingHigh.setUniformMatrix("invMVPM", invMVPM);
+            skyShaderSecondaryRayMarchingHigh.setUniformMatrix("invView", glm::inverse(view));
+            skyShaderSecondaryRayMarchingHigh.setUniformMatrix("invProj", glm::inverse(projection));
+
+            // set textures (weather + noise)
+            skyShaderSecondaryRayMarchingHigh.setUniform1i("perlworl", 0);
+            skyShaderSecondaryRayMarchingHigh.setUniform1i("worl", 1);
+            skyShaderSecondaryRayMarchingHigh.setUniform1i("curl", 2);
+            skyShaderSecondaryRayMarchingHigh.setUniform1i("weather", 3);
+            skyShaderSecondaryRayMarchingHigh.setUniform1i("blueNoise", 4);
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_3D, perlworltex);
+            glActiveTexture(GL_TEXTURE1);
+            glBindTexture(GL_TEXTURE_3D, worltex);
+            glActiveTexture(GL_TEXTURE2);
+            glBindTexture(GL_TEXTURE_2D, curltex);
+            glActiveTexture(GL_TEXTURE3);
+            glBindTexture(GL_TEXTURE_2D, weathertex);
+            glActiveTexture(GL_TEXTURE4);
+            glBindTexture(GL_TEXTURE_2D, blueNoiseTex);
 
             glBindVertexArray(VAO);
             glDrawArrays(GL_TRIANGLES, 0, 3);

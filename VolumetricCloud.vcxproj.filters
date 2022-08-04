@@ -90,6 +90,8 @@
     <None Include="VertexShader_FOM.vert" />
     <None Include="VertexShader_gaussianFOM.vert" />
     <None Include="VertexShader_sky_FOM.vert" />
+    <None Include="FragmentShader_sky_secondaryRayHigh.frag" />
+    <None Include="VertexShader_sky_secondaryRayHigh.vert" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Camera.h">

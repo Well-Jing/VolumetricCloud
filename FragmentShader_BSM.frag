@@ -81,9 +81,10 @@ vec4 march(vec3 pos, vec3 dir, float stepDist, int numSamples)
 	vec3 p = pos;           // sample position
 	float totalTrans = 1.0; // total tranparency
 	float depth = 0;
-	const float densityScale = 0.025; // scale the attenuation of cloud // this value is not match the sky shader, but large value leads to problem
+	//const float densityScale = 0.025; // scale the attenuation of cloud // this value is not match the sky shader, but large value leads to problem
+	float densityScale = 0.05; // scale the attenuation of cloud // this value is not match the sky shader, but large value leads to problem
 	const float weatherScale = 0.00006; // original 0.00008
-	const float breakTrans = 0.05; // hardcode value, can be manipulated by the artists
+	const float breakTrans = 0.01; // hardcode value, can be manipulated by the artists
 	float THRESHOLD = 0.001;
 
 	float frontDepth = -1;
